@@ -1,6 +1,6 @@
 import { GameState } from './GameState.js';
 import { RummikubRules } from './RummikubRules.js';
-import { RandomAI } from './ai/RandomAI.js';
+import { UltraAI } from './ai/UltraAI.js';
 
 /**
  * Controls game flow and UI interactions
@@ -13,7 +13,7 @@ export class GameController {
         this.aiMode = false;
         this.aiModeInterval = null;
         this.newlyAddedTiles = new Set(); // Track tiles just added to board for glow effect
-        this.currentAI = new RandomAI(); // Default AI strategy
+        this.currentAI = new UltraAI(); // Default AI strategy - uses optimal multi-set manipulation
         this.initializeUI();
     }
 

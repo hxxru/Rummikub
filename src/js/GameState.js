@@ -273,7 +273,110 @@ export class GameState {
 
         let tilesPlayed = 0;
 
-        if (move.action === 'play') {
+        if (move.action === 'totalRebuild') {
+            // UltraAI: Complete table rebuild
+            this.runs = Array(10).fill(null).map(() => []);
+            this.groups = Array(16).fill(null).map(() => []);
+
+            for (const set of move.newSets) {
+                const handTiles = set.filter(t => this.computerRack.find(r => r.instanceId === t.instanceId));
+                tilesPlayed += handTiles.length;
+
+                // Remove from rack
+                handTiles.forEach(tile => {
+                    const index = this.computerRack.findIndex(t => t.instanceId === tile.instanceId);
+                    if (index !== -1) {
+                        this.computerRack.splice(index, 1);
+                    }
+                });
+
+                // Add to table
+                const isRun = RummikubRules.isValidRun(set);
+                if (isRun) {
+                    const emptyIndex = this.runs.findIndex(r => r.length === 0);
+                    if (emptyIndex !== -1) {
+                        this.runs[emptyIndex] = set;
+                    }
+                } else {
+                    const emptyIndex = this.groups.findIndex(g => g.length === 0);
+                    if (emptyIndex !== -1) {
+                        this.groups[emptyIndex] = set;
+                    }
+                }
+            }
+
+            this.computerHasMelded = true;
+
+            if (this.computerRack.length === 0) {
+                this.gameOver = true;
+                this.winner = 'computer';
+                this.aiPlayer.recordMove(tilesPlayed);
+                this.aiPlayer.recordGame(true);
+                return { played: true, winner: 'computer' };
+            }
+        } else if (move.action === 'playMultiple') {
+            // Handle multiple sets being played at once
+            if (move.manipulations) {
+                for (const manip of move.manipulations) {
+                    tilesPlayed += manip.tiles.length;
+
+                    // Remove from rack
+                    manip.tiles.forEach(tile => {
+                        const index = this.computerRack.findIndex(t => t.instanceId === tile.instanceId);
+                        if (index !== -1) {
+                            this.computerRack.splice(index, 1);
+                        }
+                    });
+
+                    // Apply manipulation
+                    if (manip.type === 'extendRun') {
+                        this.runs[manip.targetIndex].push(...manip.tiles);
+                        this.runs[manip.targetIndex].sort((a, b) => a.number - b.number);
+                    } else if (manip.type === 'addToGroup') {
+                        this.groups[manip.targetIndex].push(...manip.tiles);
+                    }
+                }
+            }
+
+            if (move.sets) {
+                for (const set of move.sets) {
+                    tilesPlayed += set.length;
+
+                    // Remove from rack
+                    set.forEach(tile => {
+                        const index = this.computerRack.findIndex(t => t.instanceId === tile.instanceId);
+                        if (index !== -1) {
+                            this.computerRack.splice(index, 1);
+                        }
+                    });
+
+                    // Add to table
+                    const isRun = RummikubRules.isValidRun(set);
+                    if (isRun) {
+                        const emptyIndex = this.runs.findIndex(r => r.length === 0);
+                        if (emptyIndex !== -1) {
+                            this.runs[emptyIndex] = set;
+                            this.runs[emptyIndex].sort((a, b) => a.number - b.number);
+                        }
+                    } else {
+                        const emptyIndex = this.groups.findIndex(g => g.length === 0);
+                        if (emptyIndex !== -1) {
+                            this.groups[emptyIndex] = set;
+                        }
+                    }
+                }
+            }
+
+            this.computerHasMelded = true;
+
+            if (this.computerRack.length === 0) {
+                this.gameOver = true;
+                this.winner = 'computer';
+                this.aiPlayer.recordMove(tilesPlayed);
+                this.aiPlayer.recordGame(true);
+                return { played: true, winner: 'computer' };
+            }
+        } else if (move.action === 'play') {
             // Execute the play move
             const { tiles, targetType, targetIndex } = move;
             tilesPlayed = tiles.length;
