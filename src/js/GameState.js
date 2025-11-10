@@ -305,6 +305,37 @@ export class GameState {
                 this.aiPlayer.recordGame(true);
                 return { played: true, winner: 'computer' };
             }
+        } else if (move.action === 'manipulate') {
+            // Execute table manipulation move
+            const { manipulationType, targetIndex, tilesToAdd } = move;
+            tilesPlayed = tilesToAdd.length;
+
+            // Remove tiles from rack
+            tilesToAdd.forEach(tile => {
+                const index = this.computerRack.findIndex(t => t.instanceId === tile.instanceId);
+                if (index !== -1) {
+                    this.computerRack.splice(index, 1);
+                }
+            });
+
+            // Apply manipulation
+            if (manipulationType === 'extendRun') {
+                // Add tiles to existing run and re-sort
+                this.runs[targetIndex].push(...tilesToAdd);
+                this.runs[targetIndex].sort((a, b) => a.number - b.number);
+            } else if (manipulationType === 'addToGroup') {
+                // Add tiles to existing group
+                this.groups[targetIndex].push(...tilesToAdd);
+            }
+
+            // Check win
+            if (this.computerRack.length === 0) {
+                this.gameOver = true;
+                this.winner = 'computer';
+                this.aiPlayer.recordMove(tilesPlayed);
+                this.aiPlayer.recordGame(true);
+                return { played: true, winner: 'computer' };
+            }
         } else if (move.action === 'draw') {
             // Draw a card
             this.drawTile('computer');
@@ -316,7 +347,7 @@ export class GameState {
         this.currentTurn = 'player';
         this.startPlayerTurn();
 
-        return { played: move.action === 'play' };
+        return { played: move.action === 'play' || move.action === 'manipulate' };
     }
 
     /**
