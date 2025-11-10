@@ -68,20 +68,12 @@ export class SmartAI extends AIPlayer {
         // Play ALL regular sets from remaining rack
         while (true) {
             const possibleSets = RummikubRules.findPossibleSets(remainingRack);
-
-            let validSets = possibleSets;
-            if (!gameState.computerHasMelded && setsToPlay.length === 0 && manipulations.length === 0) {
-                validSets = possibleSets.filter(set =>
-                    RummikubRules.calculateValue(set) >= requirement
-                );
-            }
-
-            if (validSets.length === 0) break;
+            if (possibleSets.length === 0) break;
 
             // Sort by number of tiles
-            validSets.sort((a, b) => b.length - a.length);
+            possibleSets.sort((a, b) => b.length - a.length);
 
-            const setToPlay = validSets[0];
+            const setToPlay = possibleSets[0];
             setsToPlay.push(setToPlay);
 
             setToPlay.forEach(tile => {
@@ -94,6 +86,18 @@ export class SmartAI extends AIPlayer {
 
         // Return combined manipulations and new sets
         if (manipulations.length > 0 || setsToPlay.length > 0) {
+            // If haven't melded yet, check if total value meets requirement
+            if (!gameState.computerHasMelded) {
+                const totalValue = setsToPlay.reduce((sum, set) =>
+                    sum + RummikubRules.calculateValue(set), 0
+                );
+
+                if (totalValue < requirement) {
+                    // Not enough points to meld, draw instead
+                    return { action: 'draw' };
+                }
+            }
+
             return {
                 action: 'playMultiple',
                 sets: setsToPlay,

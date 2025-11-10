@@ -18,25 +18,16 @@ export class ValueAI extends AIPlayer {
         await this.delay(1000);
 
         const setsToPlay = [];
-        const remainingRack = [...gameState.computerRack];
+        let remainingRack = [...gameState.computerRack];
         const requirement = gameState.initialMeldRequirement || 30;
 
         // Keep finding and playing sets until we can't anymore
         while (true) {
             const possibleSets = RummikubRules.findPossibleSets(remainingRack);
-
-            // Filter for initial meld requirement if needed
-            let validSets = possibleSets;
-            if (!gameState.computerHasMelded && setsToPlay.length === 0) {
-                validSets = possibleSets.filter(set =>
-                    RummikubRules.calculateValue(set) >= requirement
-                );
-            }
-
-            if (validSets.length === 0) break;
+            if (possibleSets.length === 0) break;
 
             // Sort by value (descending) - value strategy
-            validSets.sort((a, b) => {
+            possibleSets.sort((a, b) => {
                 const valueA = RummikubRules.calculateValue(a);
                 const valueB = RummikubRules.calculateValue(b);
                 if (valueB !== valueA) {
@@ -46,7 +37,7 @@ export class ValueAI extends AIPlayer {
             });
 
             // Play highest value set
-            const setToPlay = validSets[0];
+            const setToPlay = possibleSets[0];
             setsToPlay.push(setToPlay);
 
             // Remove tiles from remaining rack
@@ -58,18 +49,29 @@ export class ValueAI extends AIPlayer {
             });
         }
 
-        // If we found sets to play, return them all
+        // Check if we can play these sets
         if (setsToPlay.length > 0) {
+            // If haven't melded yet, check if total value meets requirement
+            if (!gameState.computerHasMelded) {
+                const totalValue = setsToPlay.reduce((sum, set) =>
+                    sum + RummikubRules.calculateValue(set), 0
+                );
+
+                if (totalValue < requirement) {
+                    // Not enough points to meld, draw instead
+                    return { action: 'draw' };
+                }
+            }
+
+            // Either already melded, or have enough points to meld
             return {
                 action: 'playMultiple',
                 sets: setsToPlay
             };
         }
 
-        // No valid play, draw a card
-        return {
-            action: 'draw'
-        };
+        // No valid sets found, draw a card
+        return { action: 'draw' };
     }
 
     /**
