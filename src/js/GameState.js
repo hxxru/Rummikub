@@ -9,7 +9,8 @@ export class GameState {
         this.pouch = [];
         this.playerRack = [];
         this.computerRack = [];
-        this.table = []; // Array of sets
+        this.runs = Array(10).fill(null).map(() => []); // 10 run slots
+        this.groups = Array(10).fill(null).map(() => []); // 10 group slots
         this.currentTurn = 'player'; // 'player' or 'computer'
         this.playerHasMelded = false; // Has player made initial 30+ meld?
         this.computerHasMelded = false;
@@ -106,7 +107,8 @@ export class GameState {
      */
     saveTurnState() {
         this.turnStartState = {
-            table: this.table.map(set => [...set]),
+            runs: this.runs.map(run => [...run]),
+            groups: this.groups.map(group => [...group]),
             playerRack: [...this.playerRack],
             computerRack: [...this.computerRack],
             pouch: [...this.pouch]
@@ -119,7 +121,8 @@ export class GameState {
     undoTurn() {
         if (!this.turnStartState) return false;
 
-        this.table = this.turnStartState.table.map(set => [...set]);
+        this.runs = this.turnStartState.runs.map(run => [...run]);
+        this.groups = this.turnStartState.groups.map(group => [...group]);
         this.playerRack = [...this.turnStartState.playerRack];
         this.computerRack = [...this.turnStartState.computerRack];
         this.pouch = [...this.turnStartState.pouch];
@@ -131,9 +134,15 @@ export class GameState {
      * Validate current table state
      */
     validateTable() {
-        // Check each set on table
-        for (const set of this.table) {
-            if (set.length > 0 && !RummikubRules.isValidSet(set)) {
+        // Check all runs
+        for (const run of this.runs) {
+            if (run.length > 0 && !RummikubRules.isValidRun(run)) {
+                return false;
+            }
+        }
+        // Check all groups
+        for (const group of this.groups) {
+            if (group.length > 0 && !RummikubRules.isValidGroup(group)) {
                 return false;
             }
         }
@@ -146,9 +155,12 @@ export class GameState {
     validatePlayerMove() {
         // If player hasn't melded yet, check for 30+ initial meld
         if (!this.playerHasMelded) {
-            const newSets = this.table.filter(set => set.length > 0);
-            if (newSets.length > 0) {
-                if (!RummikubRules.isValidInitialMeld(newSets)) {
+            const allSets = [
+                ...this.runs.filter(run => run.length > 0),
+                ...this.groups.filter(group => group.length > 0)
+            ];
+            if (allSets.length > 0) {
+                if (!RummikubRules.isValidInitialMeld(allSets)) {
                     return { valid: false, reason: 'Initial meld must be 30+ points' };
                 }
                 this.playerHasMelded = true;
@@ -221,8 +233,20 @@ export class GameState {
                 }
             });
 
-            // Add to table
-            this.table.push(setToPlay);
+            // Add to appropriate slot
+            if (RummikubRules.isValidRun(setToPlay)) {
+                // Find first empty run slot
+                const emptyRunIndex = this.runs.findIndex(run => run.length === 0);
+                if (emptyRunIndex !== -1) {
+                    this.runs[emptyRunIndex] = setToPlay;
+                }
+            } else if (RummikubRules.isValidGroup(setToPlay)) {
+                // Find first empty group slot
+                const emptyGroupIndex = this.groups.findIndex(group => group.length === 0);
+                if (emptyGroupIndex !== -1) {
+                    this.groups[emptyGroupIndex] = setToPlay;
+                }
+            }
             this.computerHasMelded = true;
 
             // Check win
@@ -283,11 +307,13 @@ export class GameState {
      * Get game statistics
      */
     getStats() {
+        const runCount = this.runs.filter(run => run.length > 0).length;
+        const groupCount = this.groups.filter(group => group.length > 0).length;
         return {
             playerTileCount: this.playerRack.length,
             computerTileCount: this.computerRack.length,
             pouchCount: this.pouch.length,
-            tableSetCount: this.table.filter(set => set.length > 0).length
+            tableSetCount: runCount + groupCount
         };
     }
 }

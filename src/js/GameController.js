@@ -122,24 +122,19 @@ export class GameController {
     }
 
     /**
-     * Render runs area (8 run slots)
+     * Render runs area (10 run slots)
      */
     renderRuns() {
         const runsArea = document.getElementById('runs-area');
         runsArea.innerHTML = '';
 
-        // Get runs from table
-        const runs = this.gameState.table.filter(set =>
-            set.length === 0 || RummikubRules.isValidRun(set)
-        );
-
-        // Always show 8 run slots
-        for (let i = 0; i < 8; i++) {
+        // Always show 10 run slots
+        for (let i = 0; i < 10; i++) {
             const runEl = document.createElement('div');
             runEl.className = 'run';
             runEl.dataset.runIndex = i;
 
-            const tiles = runs[i] || [];
+            const tiles = this.gameState.runs[i] || [];
             tiles.forEach(tile => {
                 const tileEl = tile.createDOMElement();
                 this.makeTileDraggable(tileEl);
@@ -152,24 +147,19 @@ export class GameController {
     }
 
     /**
-     * Render groups area (16 group slots)
+     * Render groups area (10 group slots)
      */
     renderGroups() {
         const groupsArea = document.getElementById('groups-area');
         groupsArea.innerHTML = '';
 
-        // Get groups from table
-        const groups = this.gameState.table.filter(set =>
-            set.length === 0 || RummikubRules.isValidGroup(set)
-        );
-
-        // Always show 16 group slots
-        for (let i = 0; i < 16; i++) {
+        // Always show 10 group slots
+        for (let i = 0; i < 10; i++) {
             const groupEl = document.createElement('div');
             groupEl.className = 'group';
             groupEl.dataset.groupIndex = i;
 
-            const tiles = groups[i] || [];
+            const tiles = this.gameState.groups[i] || [];
             tiles.forEach(tile => {
                 const tileEl = tile.createDOMElement();
                 this.makeTileDraggable(tileEl);
@@ -253,19 +243,21 @@ export class GameController {
     handleTileDrop(tileEl, target) {
         const tileId = tileEl.dataset.tileId;
 
-        // Remove tile from source
+        // Find and remove tile from source
         let tile;
         if (this.dragSource.type === 'rack') {
             tile = this.gameState.removeTileFromRack(tileId);
-        } else {
-            // Find tile in table
-            for (let i = 0; i < this.gameState.table.length; i++) {
-                const set = this.gameState.table[i];
-                const tileIndex = set.findIndex(t => t.id === tileId);
-                if (tileIndex !== -1) {
-                    tile = set.splice(tileIndex, 1)[0];
-                    break;
-                }
+        } else if (this.dragSource.type === 'run') {
+            const sourceRun = this.gameState.runs[this.dragSource.index];
+            const tileIndex = sourceRun.findIndex(t => t.id === tileId);
+            if (tileIndex !== -1) {
+                tile = sourceRun.splice(tileIndex, 1)[0];
+            }
+        } else if (this.dragSource.type === 'group') {
+            const sourceGroup = this.gameState.groups[this.dragSource.index];
+            const tileIndex = sourceGroup.findIndex(t => t.id === tileId);
+            if (tileIndex !== -1) {
+                tile = sourceGroup.splice(tileIndex, 1)[0];
             }
         }
 
@@ -274,35 +266,10 @@ export class GameController {
         // Add tile to target
         if (target.type === 'rack') {
             this.gameState.addTileToRack(tile);
-        } else if (target.type === 'run' || target.type === 'group') {
-            // Find or create the set at this position
-            const isRun = target.type === 'run';
-            const targetSets = this.gameState.table.filter(set =>
-                set.length === 0 || (isRun ? RummikubRules.isValidRun(set) : RummikubRules.isValidGroup(set))
-            );
-
-            if (targetSets[target.index]) {
-                targetSets[target.index].push(tile);
-            } else {
-                // Create new set
-                const newSet = [tile];
-                // Find proper position in table
-                const existingRunCount = this.gameState.table.filter(set =>
-                    set.length > 0 && RummikubRules.isValidRun(set)
-                ).length;
-                const existingGroupCount = this.gameState.table.filter(set =>
-                    set.length > 0 && RummikubRules.isValidGroup(set)
-                ).length;
-
-                if (isRun && target.index >= existingRunCount) {
-                    this.gameState.table.push(newSet);
-                } else if (!isRun && target.index >= existingGroupCount) {
-                    this.gameState.table.push(newSet);
-                } else {
-                    // Insert at proper position
-                    this.gameState.table.splice(target.index, 0, newSet);
-                }
-            }
+        } else if (target.type === 'run') {
+            this.gameState.runs[target.index].push(tile);
+        } else if (target.type === 'group') {
+            this.gameState.groups[target.index].push(tile);
         }
 
         // Re-render
@@ -473,8 +440,20 @@ export class GameController {
                 }
             });
 
-            // Add to table
-            this.gameState.table.push(setToPlay);
+            // Add to appropriate slot
+            if (RummikubRules.isValidRun(setToPlay)) {
+                // Find first empty run slot
+                const emptyRunIndex = this.gameState.runs.findIndex(run => run.length === 0);
+                if (emptyRunIndex !== -1) {
+                    this.gameState.runs[emptyRunIndex] = setToPlay;
+                }
+            } else if (RummikubRules.isValidGroup(setToPlay)) {
+                // Find first empty group slot
+                const emptyGroupIndex = this.gameState.groups.findIndex(group => group.length === 0);
+                if (emptyGroupIndex !== -1) {
+                    this.gameState.groups[emptyGroupIndex] = setToPlay;
+                }
+            }
             this.gameState.playerHasMelded = true;
 
             // Render and check win
