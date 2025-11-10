@@ -1,5 +1,6 @@
 import { GameState } from './GameState.js';
 import { RummikubRules } from './RummikubRules.js';
+import { RandomAI } from './ai/RandomAI.js';
 
 /**
  * Controls game flow and UI interactions
@@ -12,6 +13,7 @@ export class GameController {
         this.aiMode = false;
         this.aiModeInterval = null;
         this.newlyAddedTiles = new Set(); // Track tiles just added to board for glow effect
+        this.currentAI = new RandomAI(); // Default AI strategy
         this.initializeUI();
     }
 
@@ -60,7 +62,7 @@ export class GameController {
      * Start new game
      */
     startGame() {
-        this.gameState = new GameState();
+        this.gameState = new GameState(this.currentAI);
         this.gameState.startPlayerTurn();
 
         // Hide start screen, show game screen
