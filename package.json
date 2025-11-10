@@ -1,0 +1,21 @@
+{
+  "name": "rummikub",
+  "version": "1.0.0",
+  "description": "A polished web-based Rummikub game",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:18132/git/hxxru/Rummikub"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^7.2.2"
+  }
+}
