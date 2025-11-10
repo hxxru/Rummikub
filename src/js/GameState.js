@@ -5,7 +5,7 @@ import { RummikubRules } from './RummikubRules.js';
  * Manages the game state
  */
 export class GameState {
-    constructor() {
+    constructor(aiPlayer = null) {
         this.pouch = [];
         this.playerRack = [];
         this.computerRack = [];
@@ -17,6 +17,7 @@ export class GameState {
         this.turnStartState = null; // For undo
         this.gameOver = false;
         this.winner = null;
+        this.aiPlayer = aiPlayer; // AI strategy to use for computer player
 
         this.initializeGame();
     }
@@ -212,6 +213,9 @@ export class GameState {
         if (this.playerRack.length === 0) {
             this.gameOver = true;
             this.winner = 'player';
+            if (this.aiPlayer) {
+                this.aiPlayer.recordGame(false); // AI lost
+            }
             return { success: true, winner: 'player' };
         }
 
@@ -260,54 +264,193 @@ export class GameState {
      * Computer AI turn
      */
     async computerTurn() {
-        // Simple AI: try to play any valid sets, otherwise draw
-        await this.delay(1000); // Simulate thinking
+        if (!this.aiPlayer) {
+            throw new Error('No AI player configured');
+        }
 
-        const possibleSets = RummikubRules.findPossibleSets(this.computerRack);
+        // Get move from AI strategy
+        const move = await this.aiPlayer.makeMove(this);
 
-        if (possibleSets.length > 0 && (this.computerHasMelded || RummikubRules.calculateValue(possibleSets[0]) >= 30)) {
-            // Play first valid set
-            const setToPlay = possibleSets[0];
+        let tilesPlayed = 0;
+
+        if (move.action === 'totalRebuild') {
+            // UltraAI: Complete table rebuild
+            this.runs = Array(10).fill(null).map(() => []);
+            this.groups = Array(16).fill(null).map(() => []);
+
+            for (const set of move.newSets) {
+                const handTiles = set.filter(t => this.computerRack.find(r => r.instanceId === t.instanceId));
+                tilesPlayed += handTiles.length;
+
+                // Remove from rack
+                handTiles.forEach(tile => {
+                    const index = this.computerRack.findIndex(t => t.instanceId === tile.instanceId);
+                    if (index !== -1) {
+                        this.computerRack.splice(index, 1);
+                    }
+                });
+
+                // Add to table
+                const isRun = RummikubRules.isValidRun(set);
+                if (isRun) {
+                    const emptyIndex = this.runs.findIndex(r => r.length === 0);
+                    if (emptyIndex !== -1) {
+                        this.runs[emptyIndex] = set;
+                    }
+                } else {
+                    const emptyIndex = this.groups.findIndex(g => g.length === 0);
+                    if (emptyIndex !== -1) {
+                        this.groups[emptyIndex] = set;
+                    }
+                }
+            }
+
+            this.computerHasMelded = true;
+
+            if (this.computerRack.length === 0) {
+                this.gameOver = true;
+                this.winner = 'computer';
+                this.aiPlayer.recordMove(tilesPlayed);
+                this.aiPlayer.recordGame(true);
+                return { played: true, winner: 'computer' };
+            }
+        } else if (move.action === 'playMultiple') {
+            // Handle multiple sets being played at once
+            if (move.manipulations) {
+                for (const manip of move.manipulations) {
+                    tilesPlayed += manip.tiles.length;
+
+                    // Remove from rack
+                    manip.tiles.forEach(tile => {
+                        const index = this.computerRack.findIndex(t => t.instanceId === tile.instanceId);
+                        if (index !== -1) {
+                            this.computerRack.splice(index, 1);
+                        }
+                    });
+
+                    // Apply manipulation
+                    if (manip.type === 'extendRun') {
+                        this.runs[manip.targetIndex].push(...manip.tiles);
+                        this.runs[manip.targetIndex].sort((a, b) => a.number - b.number);
+                    } else if (manip.type === 'addToGroup') {
+                        this.groups[manip.targetIndex].push(...manip.tiles);
+                    }
+                }
+            }
+
+            if (move.sets) {
+                for (const set of move.sets) {
+                    tilesPlayed += set.length;
+
+                    // Remove from rack
+                    set.forEach(tile => {
+                        const index = this.computerRack.findIndex(t => t.instanceId === tile.instanceId);
+                        if (index !== -1) {
+                            this.computerRack.splice(index, 1);
+                        }
+                    });
+
+                    // Add to table
+                    const isRun = RummikubRules.isValidRun(set);
+                    if (isRun) {
+                        const emptyIndex = this.runs.findIndex(r => r.length === 0);
+                        if (emptyIndex !== -1) {
+                            this.runs[emptyIndex] = set;
+                            this.runs[emptyIndex].sort((a, b) => a.number - b.number);
+                        }
+                    } else {
+                        const emptyIndex = this.groups.findIndex(g => g.length === 0);
+                        if (emptyIndex !== -1) {
+                            this.groups[emptyIndex] = set;
+                        }
+                    }
+                }
+            }
+
+            this.computerHasMelded = true;
+
+            if (this.computerRack.length === 0) {
+                this.gameOver = true;
+                this.winner = 'computer';
+                this.aiPlayer.recordMove(tilesPlayed);
+                this.aiPlayer.recordGame(true);
+                return { played: true, winner: 'computer' };
+            }
+        } else if (move.action === 'play') {
+            // Execute the play move
+            const { tiles, targetType, targetIndex } = move;
+            tilesPlayed = tiles.length;
 
             // Remove tiles from rack
-            setToPlay.forEach(tile => {
-                const index = this.computerRack.findIndex(t => t.id === tile.id);
+            tiles.forEach(tile => {
+                const index = this.computerRack.findIndex(t => t.instanceId === tile.instanceId);
                 if (index !== -1) {
                     this.computerRack.splice(index, 1);
                 }
             });
 
             // Add to appropriate slot
-            if (RummikubRules.isValidRun(setToPlay)) {
-                // Find first empty run slot
-                const emptyRunIndex = this.runs.findIndex(run => run.length === 0);
-                if (emptyRunIndex !== -1) {
-                    this.runs[emptyRunIndex] = setToPlay;
-                }
-            } else if (RummikubRules.isValidGroup(setToPlay)) {
-                // Find first empty group slot
-                const emptyGroupIndex = this.groups.findIndex(group => group.length === 0);
-                if (emptyGroupIndex !== -1) {
-                    this.groups[emptyGroupIndex] = setToPlay;
-                }
+            if (targetType === 'run') {
+                this.runs[targetIndex] = tiles;
+                // Auto-sort runs
+                this.runs[targetIndex].sort((a, b) => a.number - b.number);
+            } else if (targetType === 'group') {
+                this.groups[targetIndex] = tiles;
             }
+
             this.computerHasMelded = true;
 
             // Check win
             if (this.computerRack.length === 0) {
                 this.gameOver = true;
                 this.winner = 'computer';
+                this.aiPlayer.recordMove(tilesPlayed);
+                this.aiPlayer.recordGame(true);
                 return { played: true, winner: 'computer' };
             }
-        } else {
+        } else if (move.action === 'manipulate') {
+            // Execute table manipulation move
+            const { manipulationType, targetIndex, tilesToAdd } = move;
+            tilesPlayed = tilesToAdd.length;
+
+            // Remove tiles from rack
+            tilesToAdd.forEach(tile => {
+                const index = this.computerRack.findIndex(t => t.instanceId === tile.instanceId);
+                if (index !== -1) {
+                    this.computerRack.splice(index, 1);
+                }
+            });
+
+            // Apply manipulation
+            if (manipulationType === 'extendRun') {
+                // Add tiles to existing run and re-sort
+                this.runs[targetIndex].push(...tilesToAdd);
+                this.runs[targetIndex].sort((a, b) => a.number - b.number);
+            } else if (manipulationType === 'addToGroup') {
+                // Add tiles to existing group
+                this.groups[targetIndex].push(...tilesToAdd);
+            }
+
+            // Check win
+            if (this.computerRack.length === 0) {
+                this.gameOver = true;
+                this.winner = 'computer';
+                this.aiPlayer.recordMove(tilesPlayed);
+                this.aiPlayer.recordGame(true);
+                return { played: true, winner: 'computer' };
+            }
+        } else if (move.action === 'draw') {
             // Draw a card
             this.drawTile('computer');
         }
 
+        // Record move stats
+        this.aiPlayer.recordMove(tilesPlayed);
+
         this.currentTurn = 'player';
         this.startPlayerTurn();
 
-        return { played: possibleSets.length > 0 };
+        return { played: move.action === 'play' || move.action === 'manipulate' };
     }
 
     /**
