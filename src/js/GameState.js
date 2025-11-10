@@ -10,7 +10,7 @@ export class GameState {
         this.playerRack = [];
         this.computerRack = [];
         this.runs = Array(10).fill(null).map(() => []); // 10 run slots
-        this.groups = Array(10).fill(null).map(() => []); // 10 group slots
+        this.groups = Array(16).fill(null).map(() => []); // 16 group slots (2x8 layout)
         this.currentTurn = 'player'; // 'player' or 'computer'
         this.playerHasMelded = false; // Has player made initial 30+ meld?
         this.computerHasMelded = false;

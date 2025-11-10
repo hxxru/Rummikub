@@ -142,8 +142,8 @@ export class GameController {
             const tiles = this.gameState.runs[i] || [];
             tiles.forEach(tile => {
                 const tileEl = tile.createDOMElement();
-                // Add glow effect to newly added tiles
-                if (this.newlyAddedTiles.has(tile.id)) {
+                // Add glow effect to newly added tiles (using instanceId)
+                if (this.newlyAddedTiles.has(tile.instanceId)) {
                     tileEl.classList.add('newly-added');
                 }
                 this.makeTileDraggable(tileEl);
@@ -156,31 +156,40 @@ export class GameController {
     }
 
     /**
-     * Render groups area (10 group slots)
+     * Render groups area (16 group slots in 2x8 layout)
      */
     renderGroups() {
         const groupsArea = document.getElementById('groups-area');
         groupsArea.innerHTML = '';
 
-        // Always show 10 group slots
-        for (let i = 0; i < 10; i++) {
-            const groupEl = document.createElement('div');
-            groupEl.className = 'group';
-            groupEl.dataset.groupIndex = i;
+        // Create 2 columns
+        for (let col = 0; col < 2; col++) {
+            const columnEl = document.createElement('div');
+            columnEl.className = 'groups-column';
 
-            const tiles = this.gameState.groups[i] || [];
-            tiles.forEach(tile => {
-                const tileEl = tile.createDOMElement();
-                // Add glow effect to newly added tiles
-                if (this.newlyAddedTiles.has(tile.id)) {
-                    tileEl.classList.add('newly-added');
-                }
-                this.makeTileDraggable(tileEl);
-                groupEl.appendChild(tileEl);
-            });
+            // 8 rows per column
+            for (let row = 0; row < 8; row++) {
+                const groupIndex = col * 8 + row;
+                const groupEl = document.createElement('div');
+                groupEl.className = 'group';
+                groupEl.dataset.groupIndex = groupIndex;
 
-            this.makeDroppable(groupEl, { type: 'group', index: i });
-            groupsArea.appendChild(groupEl);
+                const tiles = this.gameState.groups[groupIndex] || [];
+                tiles.forEach(tile => {
+                    const tileEl = tile.createDOMElement();
+                    // Add glow effect to newly added tiles (using instanceId)
+                    if (this.newlyAddedTiles.has(tile.instanceId)) {
+                        tileEl.classList.add('newly-added');
+                    }
+                    this.makeTileDraggable(tileEl);
+                    groupEl.appendChild(tileEl);
+                });
+
+                this.makeDroppable(groupEl, { type: 'group', index: groupIndex });
+                columnEl.appendChild(groupEl);
+            }
+
+            groupsArea.appendChild(columnEl);
         }
     }
 
@@ -281,12 +290,8 @@ export class GameController {
         // Track if tile is being added to board (for glow effect)
         const toBoard = target.type === 'run' || target.type === 'group';
         if (fromRack && toBoard) {
-            this.newlyAddedTiles.add(tileId);
-            // Remove glow after 3 seconds
-            setTimeout(() => {
-                this.newlyAddedTiles.delete(tileId);
-                this.render();
-            }, 3000);
+            // Use instanceId to avoid highlighting both copies of same tile
+            this.newlyAddedTiles.add(tile.instanceId);
         }
 
         // Add tile to target
@@ -353,6 +358,9 @@ export class GameController {
             this.showMessage(result.message, 'error');
             return;
         }
+
+        // Clear newly added tiles glow when turn ends
+        this.newlyAddedTiles.clear();
 
         if (result.winner === 'player') {
             this.showWinScreen('player');
