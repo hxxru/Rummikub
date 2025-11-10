@@ -16,8 +16,11 @@ export class Tile {
         '4': 'red'
     };
 
+    static instanceCounter = 0;
+
     constructor(id, number, color, imagePath) {
         this.id = id;
+        this.instanceId = ++Tile.instanceCounter; // Unique ID for each tile instance
         this.number = number;
         this.color = color;
         this.imagePath = imagePath;
@@ -65,6 +68,7 @@ export class Tile {
         const tileDiv = document.createElement('div');
         tileDiv.className = 'tile';
         tileDiv.dataset.tileId = this.id;
+        tileDiv.dataset.instanceId = this.instanceId; // Track unique instance
         tileDiv.draggable = true;
 
         const img = document.createElement('img');
