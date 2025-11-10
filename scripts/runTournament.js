@@ -14,6 +14,7 @@ import { GreedyAI } from '../src/js/ai/GreedyAI.js';
 import { ValueAI } from '../src/js/ai/ValueAI.js';
 import { SmartAI } from '../src/js/ai/SmartAI.js';
 import { AdvancedAI } from '../src/js/ai/AdvancedAI.js';
+import { UltraAI } from '../src/js/ai/UltraAI.js';
 
 class TournamentGame {
     constructor(ai1, ai2) {
@@ -98,7 +99,102 @@ class TournamentGame {
         let tilesPlayed = 0;
         const rack = player === 1 ? this.rack1 : this.rack2;
 
-        if (move.action === 'complexManipulation') {
+        if (move.action === 'totalRebuild') {
+            // Complete table rebuild - clear all sets and rebuild from scratch
+            this.runs = Array(10).fill(null).map(() => []);
+            this.groups = Array(16).fill(null).map(() => []);
+
+            for (const set of move.newSets) {
+                // Count tiles from hand
+                const handTiles = set.filter(t => rack.find(r => r.instanceId === t.instanceId));
+                tilesPlayed += handTiles.length;
+
+                // Remove hand tiles from rack
+                handTiles.forEach(tile => {
+                    const index = rack.findIndex(t => t.instanceId === tile.instanceId);
+                    if (index !== -1) {
+                        rack.splice(index, 1);
+                    }
+                });
+
+                // Add set to table
+                const isRun = RummikubRules.isValidRun(set);
+                if (isRun) {
+                    const emptyIndex = this.runs.findIndex(r => r.length === 0);
+                    if (emptyIndex !== -1) {
+                        this.runs[emptyIndex] = set;
+                    }
+                } else {
+                    const emptyIndex = this.groups.findIndex(g => g.length === 0);
+                    if (emptyIndex !== -1) {
+                        this.groups[emptyIndex] = set;
+                    }
+                }
+            }
+
+            if (player === 1) {
+                this.melded1 = true;
+            } else {
+                this.melded2 = true;
+            }
+
+            if (rack.length === 0) {
+                this.gameOver = true;
+                this.winner = player;
+            }
+        } else if (move.action === 'multiSetRearrange') {
+            // Multi-set rearrangement
+            for (const op of move.operations) {
+                if (op.type === 'clearRuns') {
+                    op.indices.forEach(idx => {
+                        this.runs[idx] = [];
+                    });
+                } else if (op.type === 'clearGroups') {
+                    op.indices.forEach(idx => {
+                        this.groups[idx] = [];
+                    });
+                } else if (op.type === 'addNewSets') {
+                    for (const set of op.sets) {
+                        // Count hand tiles
+                        const handTiles = set.filter(t => rack.find(r => r.instanceId === t.instanceId));
+                        tilesPlayed += handTiles.length;
+
+                        // Remove from rack
+                        handTiles.forEach(tile => {
+                            const index = rack.findIndex(t => t.instanceId === tile.instanceId);
+                            if (index !== -1) {
+                                rack.splice(index, 1);
+                            }
+                        });
+
+                        // Add to table
+                        const isRun = RummikubRules.isValidRun(set);
+                        if (isRun) {
+                            const emptyIndex = this.runs.findIndex(r => r.length === 0);
+                            if (emptyIndex !== -1) {
+                                this.runs[emptyIndex] = set;
+                            }
+                        } else {
+                            const emptyIndex = this.groups.findIndex(g => g.length === 0);
+                            if (emptyIndex !== -1) {
+                                this.groups[emptyIndex] = set;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (player === 1) {
+                this.melded1 = true;
+            } else {
+                this.melded2 = true;
+            }
+
+            if (rack.length === 0) {
+                this.gameOver = true;
+                this.winner = player;
+            }
+        } else if (move.action === 'complexManipulation') {
             // Handle advanced table manipulation
             for (const op of move.operations) {
                 if (op.type === 'modifyRun') {
@@ -370,7 +466,8 @@ async function main() {
         new GreedyAI(),
         new ValueAI(),
         new SmartAI(),
-        new AdvancedAI()
+        new AdvancedAI(),
+        new UltraAI()
     ];
 
     const gamesPerMatchup = parseInt(process.argv[2]) || 50;
