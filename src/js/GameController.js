@@ -415,9 +415,20 @@ export class GameController {
         AnimationHelper.showAIThinking();
         this.showMessage('Computer is thinking...', 'info');
 
+        // Capture state before AI move
+        const beforeState = this.captureGameState();
+
         const computerResult = await this.gameState.computerTurn();
 
         AnimationHelper.hideAIThinking();
+
+        // Animate the AI's move if it played tiles
+        if (computerResult.action !== 'draw' && computerResult.tilesPlayed > 0) {
+            await this.animateAIMove(beforeState, computerResult);
+        } else {
+            // Just render immediately for draws
+            this.render();
+        }
 
         // Show what computer did
         this.showComputerAction(computerResult);
@@ -429,7 +440,277 @@ export class GameController {
 
         // Player's turn again
         AnimationHelper.setActivePlayer(true);
+    }
+
+    /**
+     * Capture current game state for comparison
+     */
+    captureGameState() {
+        return {
+            computerRackSize: this.gameState.computerRack.length,
+            runs: this.gameState.runs.map(run => run.map(t => ({ id: t.id, instanceId: t.instanceId }))),
+            groups: this.gameState.groups.map(group => group.map(t => ({ id: t.id, instanceId: t.instanceId })))
+        };
+    }
+
+    /**
+     * Animate AI move by comparing before/after states
+     */
+    async animateAIMove(beforeState, moveResult) {
+        // Step 1: Animate tiles leaving computer's rack (one at a time)
+        const tilesRemoved = beforeState.computerRackSize - this.gameState.computerRack.length;
+        if (tilesRemoved > 0) {
+            await this.animateTilesLeavingComputerRack(tilesRemoved);
+        }
+
+        // Step 2: For rebuilds, show table being cleared
+        if (moveResult.action === 'totalRebuild') {
+            await this.animateTableClear();
+        }
+
+        // Step 3: Render new state but with tiles invisible (preparing for appearance animation)
         this.render();
+
+        // Step 4: Animate new tiles appearing on table (one at a time)
+        await this.animateNewTilesAppearing(beforeState);
+    }
+
+    /**
+     * Animate tiles leaving computer's rack one at a time
+     */
+    async animateTilesLeavingComputerRack(count) {
+        const computerRack = document.getElementById('computer-rack');
+        const tileBacks = Array.from(computerRack.querySelectorAll('.tile-back'));
+
+        // Animate tiles one at a time
+        for (let i = 0; i < Math.min(count, tileBacks.length); i++) {
+            const tileBack = tileBacks[i];
+            tileBack.classList.add('ai-moving');
+
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            tileBack.classList.add('removing');
+
+            await new Promise(resolve => setTimeout(resolve, 400));
+        }
+    }
+
+    /**
+     * Animate table being cleared for rebuild
+     */
+    async animateTableClear() {
+        const allTableTiles = [
+            ...document.querySelectorAll('#runs-area .tile'),
+            ...document.querySelectorAll('#groups-area .tile')
+        ];
+
+        // Quick flash to show table is being cleared
+        allTableTiles.forEach(tile => {
+            tile.classList.add('rearranging');
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        allTableTiles.forEach(tile => {
+            tile.classList.remove('rearranging');
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    /**
+     * Animate new tiles appearing on table one at a time
+     */
+    async animateNewTilesAppearing(beforeState) {
+        // Find all new tiles on the table
+        const newTiles = this.findNewTilesOnTable(beforeState);
+
+        // Also find tiles that moved positions (for rearrangements)
+        const movedTiles = this.findMovedTilesOnTable(beforeState);
+
+        // First, highlight tiles that moved position (quick flash)
+        if (movedTiles.length > 0) {
+            for (const tileInfo of movedTiles) {
+                const tileElement = this.findTileElement(tileInfo.location, tileInfo.index, tileInfo.tileIndex);
+                if (tileElement) {
+                    tileElement.classList.add('rearranging');
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 400));
+
+            // Remove highlight
+            movedTiles.forEach(tileInfo => {
+                const tileElement = this.findTileElement(tileInfo.location, tileInfo.index, tileInfo.tileIndex);
+                if (tileElement) {
+                    tileElement.classList.remove('rearranging');
+                }
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        // Then animate each new tile appearing one at a time
+        for (const tileInfo of newTiles) {
+            const tileElement = this.findTileElement(tileInfo.location, tileInfo.index, tileInfo.tileIndex);
+
+            if (tileElement) {
+                // Start invisible
+                tileElement.style.opacity = '0';
+
+                // Trigger reflow
+                tileElement.offsetHeight;
+
+                // Add appearing animation
+                tileElement.classList.add('appearing');
+                tileElement.style.opacity = '1';
+
+                // Wait for this tile to finish appearing before moving to next
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                tileElement.classList.remove('appearing');
+            }
+        }
+    }
+
+    /**
+     * Find tiles that are new on the table
+     */
+    findNewTilesOnTable(beforeState) {
+        const newTiles = [];
+
+        // Check runs
+        this.gameState.runs.forEach((run, runIndex) => {
+            const beforeRun = beforeState.runs[runIndex] || [];
+            run.forEach((tile, tileIndex) => {
+                const existedBefore = beforeRun.some(bt => bt.instanceId === tile.instanceId);
+                if (!existedBefore) {
+                    newTiles.push({
+                        location: 'run',
+                        index: runIndex,
+                        tileIndex: tileIndex,
+                        instanceId: tile.instanceId
+                    });
+                }
+            });
+        });
+
+        // Check groups
+        this.gameState.groups.forEach((group, groupIndex) => {
+            const beforeGroup = beforeState.groups[groupIndex] || [];
+            group.forEach((tile, tileIndex) => {
+                const existedBefore = beforeGroup.some(bt => bt.instanceId === tile.instanceId);
+                if (!existedBefore) {
+                    newTiles.push({
+                        location: 'group',
+                        index: groupIndex,
+                        tileIndex: tileIndex,
+                        instanceId: tile.instanceId
+                    });
+                }
+            });
+        });
+
+        return newTiles;
+    }
+
+    /**
+     * Find tiles that moved positions on the table (for rearrangements)
+     */
+    findMovedTilesOnTable(beforeState) {
+        const movedTiles = [];
+
+        // Check runs for tiles that existed before but in different positions
+        this.gameState.runs.forEach((run, runIndex) => {
+            run.forEach((tile, tileIndex) => {
+                // Was this tile on the table before?
+                let foundInBefore = false;
+                beforeState.runs.forEach((beforeRun, beforeRunIndex) => {
+                    const tileIndexInBefore = beforeRun.findIndex(bt => bt.instanceId === tile.instanceId);
+                    if (tileIndexInBefore !== -1) {
+                        foundInBefore = true;
+                        // Did it move?
+                        if (beforeRunIndex !== runIndex || tileIndexInBefore !== tileIndex) {
+                            movedTiles.push({
+                                location: 'run',
+                                index: runIndex,
+                                tileIndex: tileIndex,
+                                instanceId: tile.instanceId
+                            });
+                        }
+                    }
+                });
+
+                // Also check if it was in groups before
+                if (!foundInBefore) {
+                    beforeState.groups.forEach((beforeGroup) => {
+                        if (beforeGroup.some(bt => bt.instanceId === tile.instanceId)) {
+                            movedTiles.push({
+                                location: 'run',
+                                index: runIndex,
+                                tileIndex: tileIndex,
+                                instanceId: tile.instanceId
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        // Check groups for tiles that existed before but in different positions
+        this.gameState.groups.forEach((group, groupIndex) => {
+            group.forEach((tile, tileIndex) => {
+                let foundInBefore = false;
+                beforeState.groups.forEach((beforeGroup, beforeGroupIndex) => {
+                    const tileIndexInBefore = beforeGroup.findIndex(bt => bt.instanceId === tile.instanceId);
+                    if (tileIndexInBefore !== -1) {
+                        foundInBefore = true;
+                        if (beforeGroupIndex !== groupIndex || tileIndexInBefore !== tileIndex) {
+                            movedTiles.push({
+                                location: 'group',
+                                index: groupIndex,
+                                tileIndex: tileIndex,
+                                instanceId: tile.instanceId
+                            });
+                        }
+                    }
+                });
+
+                // Also check if it was in runs before
+                if (!foundInBefore) {
+                    beforeState.runs.forEach((beforeRun) => {
+                        if (beforeRun.some(bt => bt.instanceId === tile.instanceId)) {
+                            movedTiles.push({
+                                location: 'group',
+                                index: groupIndex,
+                                tileIndex: tileIndex,
+                                instanceId: tile.instanceId
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        return movedTiles;
+    }
+
+    /**
+     * Find a tile element on the table by location and indices
+     */
+    findTileElement(location, setIndex, tileIndex) {
+        if (location === 'run') {
+            const runElement = document.querySelector(`#runs-area .run[data-run-index="${setIndex}"]`);
+            if (runElement) {
+                return runElement.children[tileIndex];
+            }
+        } else if (location === 'group') {
+            const groupElement = document.querySelector(`#groups-area .group[data-group-index="${setIndex}"]`);
+            if (groupElement) {
+                return groupElement.children[tileIndex];
+            }
+        }
+        return null;
     }
 
     /**
