@@ -11,6 +11,7 @@ export class GameController {
         this.dragSource = null; // {type: 'rack'|'run'|'group', index: number}
         this.aiMode = false;
         this.aiModeInterval = null;
+        this.newlyAddedTiles = new Set(); // Track tiles just added to board for glow effect
         this.initializeUI();
     }
 
@@ -30,7 +31,11 @@ export class GameController {
 
         // Game controls
         document.getElementById('sort-btn').addEventListener('click', () => {
-            this.sortPlayerRack();
+            this.sortPlayerRack(false);
+        });
+
+        document.getElementById('sort-number-btn').addEventListener('click', () => {
+            this.sortPlayerRack(true);
         });
 
         document.getElementById('undo-btn').addEventListener('click', () => {
@@ -137,6 +142,10 @@ export class GameController {
             const tiles = this.gameState.runs[i] || [];
             tiles.forEach(tile => {
                 const tileEl = tile.createDOMElement();
+                // Add glow effect to newly added tiles
+                if (this.newlyAddedTiles.has(tile.id)) {
+                    tileEl.classList.add('newly-added');
+                }
                 this.makeTileDraggable(tileEl);
                 runEl.appendChild(tileEl);
             });
@@ -162,6 +171,10 @@ export class GameController {
             const tiles = this.gameState.groups[i] || [];
             tiles.forEach(tile => {
                 const tileEl = tile.createDOMElement();
+                // Add glow effect to newly added tiles
+                if (this.newlyAddedTiles.has(tile.id)) {
+                    tileEl.classList.add('newly-added');
+                }
                 this.makeTileDraggable(tileEl);
                 groupEl.appendChild(tileEl);
             });
@@ -245,6 +258,8 @@ export class GameController {
 
         // Find and remove tile from source
         let tile;
+        const fromRack = this.dragSource.type === 'rack';
+
         if (this.dragSource.type === 'rack') {
             tile = this.gameState.removeTileFromRack(tileId);
         } else if (this.dragSource.type === 'run') {
@@ -263,11 +278,24 @@ export class GameController {
 
         if (!tile) return;
 
+        // Track if tile is being added to board (for glow effect)
+        const toBoard = target.type === 'run' || target.type === 'group';
+        if (fromRack && toBoard) {
+            this.newlyAddedTiles.add(tileId);
+            // Remove glow after 3 seconds
+            setTimeout(() => {
+                this.newlyAddedTiles.delete(tileId);
+                this.render();
+            }, 3000);
+        }
+
         // Add tile to target
         if (target.type === 'rack') {
             this.gameState.addTileToRack(tile);
         } else if (target.type === 'run') {
             this.gameState.runs[target.index].push(tile);
+            // Auto-sort runs by tile number
+            this.gameState.runs[target.index].sort((a, b) => a.number - b.number);
         } else if (target.type === 'group') {
             this.gameState.groups[target.index].push(tile);
         }
@@ -279,8 +307,8 @@ export class GameController {
     /**
      * Sort player's rack
      */
-    sortPlayerRack() {
-        this.gameState.sortRack(this.gameState.playerRack);
+    sortPlayerRack(byNumber = false) {
+        this.gameState.sortRack(this.gameState.playerRack, byNumber);
         this.renderPlayerRack();
     }
 
@@ -296,11 +324,20 @@ export class GameController {
     /**
      * Draw a card from pouch
      */
-    drawCard() {
+    async drawCard(autoEndTurn = true) {
         const tile = this.gameState.drawTile('player');
         if (tile) {
+            this.gameState.playerDrewThisTurn = true;
             this.render();
-            this.showMessage(`Drew: ${tile.color} ${tile.number}`, 'success');
+
+            if (autoEndTurn) {
+                this.showMessage(`Drew: ${tile.color} ${tile.number} - Turn ending...`, 'success');
+                // Automatically end turn after drawing
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                await this.endTurn();
+            } else {
+                this.showMessage(`Drew: ${tile.color} ${tile.number}`, 'success');
+            }
         } else {
             this.showMessage('Pouch is empty!', 'error');
         }
@@ -340,6 +377,7 @@ export class GameController {
     updateStats() {
         const stats = this.gameState.getStats();
         document.getElementById('player-count').textContent = `x${stats.playerTileCount}`;
+        document.getElementById('computer-count').textContent = `x${stats.computerTileCount}`;
         document.getElementById('pouch-count').textContent = `x${stats.pouchCount}`;
     }
 
