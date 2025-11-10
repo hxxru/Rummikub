@@ -268,6 +268,8 @@ export class GameController {
             this.gameState.addTileToRack(tile);
         } else if (target.type === 'run') {
             this.gameState.runs[target.index].push(tile);
+            // Auto-sort runs by tile number
+            this.gameState.runs[target.index].sort((a, b) => a.number - b.number);
         } else if (target.type === 'group') {
             this.gameState.groups[target.index].push(tile);
         }
@@ -296,11 +298,20 @@ export class GameController {
     /**
      * Draw a card from pouch
      */
-    drawCard() {
+    async drawCard(autoEndTurn = true) {
         const tile = this.gameState.drawTile('player');
         if (tile) {
+            this.gameState.playerDrewThisTurn = true;
             this.render();
-            this.showMessage(`Drew: ${tile.color} ${tile.number}`, 'success');
+
+            if (autoEndTurn) {
+                this.showMessage(`Drew: ${tile.color} ${tile.number} - Turn ending...`, 'success');
+                // Automatically end turn after drawing
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                await this.endTurn();
+            } else {
+                this.showMessage(`Drew: ${tile.color} ${tile.number}`, 'success');
+            }
         } else {
             this.showMessage('Pouch is empty!', 'error');
         }
@@ -340,6 +351,7 @@ export class GameController {
     updateStats() {
         const stats = this.gameState.getStats();
         document.getElementById('player-count').textContent = `x${stats.playerTileCount}`;
+        document.getElementById('computer-count').textContent = `x${stats.computerTileCount}`;
         document.getElementById('pouch-count').textContent = `x${stats.pouchCount}`;
     }
 

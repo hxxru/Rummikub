@@ -178,16 +178,23 @@ export class GameState {
     /**
      * End player turn
      */
-    endPlayerTurn(drewCard = false) {
+    endPlayerTurn() {
         const validation = this.validatePlayerMove();
 
         if (!validation.valid) {
-            // Invalid move - must draw a card and reset
-            if (!drewCard) {
-                this.undoTurn();
-                this.drawTile('player');
-            }
-            return { success: false, message: validation.reason };
+            // Invalid move - must undo and draw
+            this.undoTurn();
+            this.drawTile('player');
+            this.playerDrewThisTurn = true;
+            return { success: false, message: validation.reason + ' - Drew a card instead' };
+        }
+
+        // Check if player made any changes to the table
+        const madeTableChanges = this.hasTableChanged();
+
+        // If no table changes and didn't draw, must draw a card
+        if (!madeTableChanges && !this.playerDrewThisTurn) {
+            return { success: false, message: 'You must either make a play or draw a card' };
         }
 
         // Check win condition
@@ -205,10 +212,36 @@ export class GameState {
     }
 
     /**
+     * Check if table has changed since start of turn
+     */
+    hasTableChanged() {
+        if (!this.turnStartState) return false;
+
+        // Compare current runs with saved runs
+        for (let i = 0; i < this.runs.length; i++) {
+            if (this.runs[i].length !== this.turnStartState.runs[i].length) return true;
+            for (let j = 0; j < this.runs[i].length; j++) {
+                if (this.runs[i][j].id !== this.turnStartState.runs[i][j].id) return true;
+            }
+        }
+
+        // Compare current groups with saved groups
+        for (let i = 0; i < this.groups.length; i++) {
+            if (this.groups[i].length !== this.turnStartState.groups[i].length) return true;
+            for (let j = 0; j < this.groups[i].length; j++) {
+                if (this.groups[i][j].id !== this.turnStartState.groups[i][j].id) return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Switch to player turn
      */
     startPlayerTurn() {
         this.currentTurn = 'player';
+        this.playerDrewThisTurn = false; // Track if player drew a card
         this.saveTurnState();
     }
 
