@@ -74,14 +74,25 @@ export class GameState {
     /**
      * Sort rack by color then number
      */
-    sortRack(rack) {
+    sortRack(rack, byNumber = false) {
         const colorOrder = { black: 0, blue: 1, orange: 2, red: 3 };
-        rack.sort((a, b) => {
-            if (a.color !== b.color) {
+        if (byNumber) {
+            // Sort by number first, then color (good for spotting groups)
+            rack.sort((a, b) => {
+                if (a.number !== b.number) {
+                    return a.number - b.number;
+                }
                 return colorOrder[a.color] - colorOrder[b.color];
-            }
-            return a.number - b.number;
-        });
+            });
+        } else {
+            // Sort by color first, then number (good for spotting runs)
+            rack.sort((a, b) => {
+                if (a.color !== b.color) {
+                    return colorOrder[a.color] - colorOrder[b.color];
+                }
+                return a.number - b.number;
+            });
+        }
     }
 
     /**

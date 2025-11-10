@@ -11,6 +11,7 @@ export class GameController {
         this.dragSource = null; // {type: 'rack'|'run'|'group', index: number}
         this.aiMode = false;
         this.aiModeInterval = null;
+        this.newlyAddedTiles = new Set(); // Track tiles just added to board for glow effect
         this.initializeUI();
     }
 
@@ -30,7 +31,11 @@ export class GameController {
 
         // Game controls
         document.getElementById('sort-btn').addEventListener('click', () => {
-            this.sortPlayerRack();
+            this.sortPlayerRack(false);
+        });
+
+        document.getElementById('sort-number-btn').addEventListener('click', () => {
+            this.sortPlayerRack(true);
         });
 
         document.getElementById('undo-btn').addEventListener('click', () => {
@@ -137,6 +142,10 @@ export class GameController {
             const tiles = this.gameState.runs[i] || [];
             tiles.forEach(tile => {
                 const tileEl = tile.createDOMElement();
+                // Add glow effect to newly added tiles
+                if (this.newlyAddedTiles.has(tile.id)) {
+                    tileEl.classList.add('newly-added');
+                }
                 this.makeTileDraggable(tileEl);
                 runEl.appendChild(tileEl);
             });
@@ -162,6 +171,10 @@ export class GameController {
             const tiles = this.gameState.groups[i] || [];
             tiles.forEach(tile => {
                 const tileEl = tile.createDOMElement();
+                // Add glow effect to newly added tiles
+                if (this.newlyAddedTiles.has(tile.id)) {
+                    tileEl.classList.add('newly-added');
+                }
                 this.makeTileDraggable(tileEl);
                 groupEl.appendChild(tileEl);
             });
@@ -245,6 +258,8 @@ export class GameController {
 
         // Find and remove tile from source
         let tile;
+        const fromRack = this.dragSource.type === 'rack';
+
         if (this.dragSource.type === 'rack') {
             tile = this.gameState.removeTileFromRack(tileId);
         } else if (this.dragSource.type === 'run') {
@@ -262,6 +277,17 @@ export class GameController {
         }
 
         if (!tile) return;
+
+        // Track if tile is being added to board (for glow effect)
+        const toBoard = target.type === 'run' || target.type === 'group';
+        if (fromRack && toBoard) {
+            this.newlyAddedTiles.add(tileId);
+            // Remove glow after 3 seconds
+            setTimeout(() => {
+                this.newlyAddedTiles.delete(tileId);
+                this.render();
+            }, 3000);
+        }
 
         // Add tile to target
         if (target.type === 'rack') {
@@ -281,8 +307,8 @@ export class GameController {
     /**
      * Sort player's rack
      */
-    sortPlayerRack() {
-        this.gameState.sortRack(this.gameState.playerRack);
+    sortPlayerRack(byNumber = false) {
+        this.gameState.sortRack(this.gameState.playerRack, byNumber);
         this.renderPlayerRack();
     }
 
