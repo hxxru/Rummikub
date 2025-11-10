@@ -1,4 +1,5 @@
 import { GameState } from './GameState.js';
+import { RummikubRules } from './RummikubRules.js';
 
 /**
  * Controls game flow and UI interactions
@@ -7,7 +8,7 @@ export class GameController {
     constructor() {
         this.gameState = null;
         this.draggedTile = null;
-        this.dragSource = null; // 'rack' or set index
+        this.dragSource = null; // {type: 'rack'|'run'|'group', index: number}
         this.initializeUI();
     }
 
@@ -67,6 +68,7 @@ export class GameController {
     restartGame() {
         document.getElementById('win-screen').classList.add('hidden');
         document.getElementById('start-screen').classList.remove('hidden');
+        document.getElementById('game-screen').classList.add('hidden');
     }
 
     /**
@@ -74,9 +76,9 @@ export class GameController {
      */
     render() {
         this.renderPlayerRack();
-        this.renderTable();
+        this.renderRuns();
+        this.renderGroups();
         this.updateStats();
-        this.updateTurnIndicator();
     }
 
     /**
@@ -93,44 +95,67 @@ export class GameController {
         });
 
         // Make rack a drop zone
-        this.makeDroppable(rackEl, 'rack');
+        this.makeDroppable(rackEl, { type: 'rack' });
     }
 
     /**
-     * Render table (all sets)
+     * Render runs area (8 run slots)
      */
-    renderTable() {
-        const tableEl = document.getElementById('table');
-        tableEl.innerHTML = '';
+    renderRuns() {
+        const runsArea = document.getElementById('runs-area');
+        runsArea.innerHTML = '';
 
-        this.gameState.table.forEach((set, index) => {
-            const setEl = this.createSetElement(set, index);
-            tableEl.appendChild(setEl);
-        });
+        // Get runs from table
+        const runs = this.gameState.table.filter(set =>
+            set.length === 0 || RummikubRules.isValidRun(set)
+        );
 
-        // Add empty set for new plays
-        const emptySet = this.createSetElement([], this.gameState.table.length);
-        emptySet.classList.add('set-empty');
-        tableEl.appendChild(emptySet);
+        // Always show 8 run slots
+        for (let i = 0; i < 8; i++) {
+            const runEl = document.createElement('div');
+            runEl.className = 'run';
+            runEl.dataset.runIndex = i;
+
+            const tiles = runs[i] || [];
+            tiles.forEach(tile => {
+                const tileEl = tile.createDOMElement();
+                this.makeTileDraggable(tileEl);
+                runEl.appendChild(tileEl);
+            });
+
+            this.makeDroppable(runEl, { type: 'run', index: i });
+            runsArea.appendChild(runEl);
+        }
     }
 
     /**
-     * Create a set element (run or group)
+     * Render groups area (16 group slots)
      */
-    createSetElement(tiles, setIndex) {
-        const setEl = document.createElement('div');
-        setEl.className = 'set';
-        setEl.dataset.setIndex = setIndex;
+    renderGroups() {
+        const groupsArea = document.getElementById('groups-area');
+        groupsArea.innerHTML = '';
 
-        tiles.forEach(tile => {
-            const tileEl = tile.createDOMElement();
-            this.makeTileDraggable(tileEl);
-            setEl.appendChild(tileEl);
-        });
+        // Get groups from table
+        const groups = this.gameState.table.filter(set =>
+            set.length === 0 || RummikubRules.isValidGroup(set)
+        );
 
-        this.makeDroppable(setEl, setIndex);
+        // Always show 16 group slots
+        for (let i = 0; i < 16; i++) {
+            const groupEl = document.createElement('div');
+            groupEl.className = 'group';
+            groupEl.dataset.groupIndex = i;
 
-        return setEl;
+            const tiles = groups[i] || [];
+            tiles.forEach(tile => {
+                const tileEl = tile.createDOMElement();
+                this.makeTileDraggable(tileEl);
+                groupEl.appendChild(tileEl);
+            });
+
+            this.makeDroppable(groupEl, { type: 'group', index: i });
+            groupsArea.appendChild(groupEl);
+        }
     }
 
     /**
@@ -139,8 +164,18 @@ export class GameController {
     makeTileDraggable(tileEl) {
         tileEl.addEventListener('dragstart', (e) => {
             this.draggedTile = e.target;
-            this.dragSource = e.target.closest('.rack') ? 'rack' :
-                            parseInt(e.target.closest('.set').dataset.setIndex);
+
+            // Determine source
+            if (e.target.closest('.player-rack')) {
+                this.dragSource = { type: 'rack' };
+            } else if (e.target.closest('.run')) {
+                const runEl = e.target.closest('.run');
+                this.dragSource = { type: 'run', index: parseInt(runEl.dataset.runIndex) };
+            } else if (e.target.closest('.group')) {
+                const groupEl = e.target.closest('.group');
+                this.dragSource = { type: 'group', index: parseInt(groupEl.dataset.groupIndex) };
+            }
+
             e.target.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/html', e.target.innerHTML);
@@ -185,27 +220,53 @@ export class GameController {
 
         // Remove tile from source
         let tile;
-        if (this.dragSource === 'rack') {
+        if (this.dragSource.type === 'rack') {
             tile = this.gameState.removeTileFromRack(tileId);
         } else {
-            const sourceSet = this.gameState.table[this.dragSource];
-            const index = sourceSet.findIndex(t => t.id === tileId);
-            if (index !== -1) {
-                tile = sourceSet.splice(index, 1)[0];
+            // Find tile in table
+            for (let i = 0; i < this.gameState.table.length; i++) {
+                const set = this.gameState.table[i];
+                const tileIndex = set.findIndex(t => t.id === tileId);
+                if (tileIndex !== -1) {
+                    tile = set.splice(tileIndex, 1)[0];
+                    break;
+                }
             }
         }
 
         if (!tile) return;
 
         // Add tile to target
-        if (target === 'rack') {
+        if (target.type === 'rack') {
             this.gameState.addTileToRack(tile);
-        } else {
-            // Add to set on table
-            if (target >= this.gameState.table.length) {
-                this.gameState.table.push([tile]);
+        } else if (target.type === 'run' || target.type === 'group') {
+            // Find or create the set at this position
+            const isRun = target.type === 'run';
+            const targetSets = this.gameState.table.filter(set =>
+                set.length === 0 || (isRun ? RummikubRules.isValidRun(set) : RummikubRules.isValidGroup(set))
+            );
+
+            if (targetSets[target.index]) {
+                targetSets[target.index].push(tile);
             } else {
-                this.gameState.table[target].push(tile);
+                // Create new set
+                const newSet = [tile];
+                // Find proper position in table
+                const existingRunCount = this.gameState.table.filter(set =>
+                    set.length > 0 && RummikubRules.isValidRun(set)
+                ).length;
+                const existingGroupCount = this.gameState.table.filter(set =>
+                    set.length > 0 && RummikubRules.isValidGroup(set)
+                ).length;
+
+                if (isRun && target.index >= existingRunCount) {
+                    this.gameState.table.push(newSet);
+                } else if (!isRun && target.index >= existingGroupCount) {
+                    this.gameState.table.push(newSet);
+                } else {
+                    // Insert at proper position
+                    this.gameState.table.splice(target.index, 0, newSet);
+                }
             }
         }
 
@@ -260,7 +321,7 @@ export class GameController {
         }
 
         // Computer's turn
-        this.updateTurnIndicator();
+        this.showMessage('Computer is thinking...', 'info');
         await this.gameState.computerTurn();
 
         if (this.gameState.winner === 'computer') {
@@ -276,23 +337,8 @@ export class GameController {
      */
     updateStats() {
         const stats = this.gameState.getStats();
-        document.getElementById('player-count').textContent = stats.playerTileCount;
-        document.getElementById('computer-count').textContent = stats.computerTileCount;
-        document.getElementById('pouch-count').textContent = stats.pouchCount;
-    }
-
-    /**
-     * Update turn indicator
-     */
-    updateTurnIndicator() {
-        const indicator = document.getElementById('current-turn');
-        if (this.gameState.currentTurn === 'player') {
-            indicator.textContent = 'Your Turn';
-            indicator.classList.remove('computer-turn');
-        } else {
-            indicator.textContent = 'Computer\'s Turn';
-            indicator.classList.add('computer-turn');
-        }
+        document.getElementById('player-count').textContent = `x${stats.playerTileCount}`;
+        document.getElementById('pouch-count').textContent = `x${stats.pouchCount}`;
     }
 
     /**
@@ -316,14 +362,11 @@ export class GameController {
     showWinScreen(winner) {
         const winScreen = document.getElementById('win-screen');
         const winnerText = document.getElementById('winner-text');
-        const winMessage = document.getElementById('win-message');
 
         if (winner === 'player') {
-            winnerText.textContent = '🎉 You Win!';
-            winMessage.textContent = 'Congratulations! You emptied your rack first!';
+            winnerText.textContent = 'You Win!';
         } else {
-            winnerText.textContent = '💻 Computer Wins!';
-            winMessage.textContent = 'Better luck next time!';
+            winnerText.textContent = 'Computer Wins!';
         }
 
         winScreen.classList.remove('hidden');
