@@ -205,13 +205,80 @@ body {
     min-height: 100vh;
 }
 
+/* Container 0: Computer Area */
+.container0 {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    gap: 10px;
+}
+
+.computer-info {
+    margin: 0 2vw;
+    width: 100px;
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.computer-info p {
+    text-align: center;
+    margin: 0 0 5px 0;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.computer-info div {
+    text-align: center;
+}
+
+.computer-info img {
+    height: 25px;
+    vertical-align: middle;
+}
+
+.computer-info span {
+    margin-left: 5px;
+    font-weight: 600;
+}
+
+.computer-rack {
+    min-height: 60px;
+    min-width: 50vw;
+    background: #DEB887;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 10px 15px;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tile-back {
+    width: 50px;
+    height: 70px;
+    background-image: url('/images/tileBack.png');
+    background-size: cover;
+    background-position: center;
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
 /* Container 1: Header */
 .container1 {
     display: flex;
     flex-direction: row;
     justify-content: center;
+    align-items: center;
     margin-bottom: 10px;
-    margin-top: 30px;
+    margin-top: 20px;
+    gap: 40px;
 }
 
 .container1 h1 {
@@ -219,6 +286,66 @@ body {
     color: white;
     font-size: 48px;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* AI Mode Toggle */
+.ai-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ai-mode-toggle label[for="ai-mode-toggle"] {
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.3);
+    transition: 0.4s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+    background-color: #4CAF50;
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(26px);
 }
 
 /* Container 2: Playing Area */

@@ -9,6 +9,8 @@ export class GameController {
         this.gameState = null;
         this.draggedTile = null;
         this.dragSource = null; // {type: 'rack'|'run'|'group', index: number}
+        this.aiMode = false;
+        this.aiModeInterval = null;
         this.initializeUI();
     }
 
@@ -41,6 +43,11 @@ export class GameController {
 
         document.getElementById('done-btn').addEventListener('click', () => {
             this.endTurn();
+        });
+
+        // AI Mode toggle
+        document.getElementById('ai-mode-toggle').addEventListener('change', (e) => {
+            this.toggleAIMode(e.target.checked);
         });
     }
 
@@ -75,10 +82,26 @@ export class GameController {
      * Render entire game state
      */
     render() {
+        this.renderComputerRack();
         this.renderPlayerRack();
         this.renderRuns();
         this.renderGroups();
         this.updateStats();
+    }
+
+    /**
+     * Render computer's rack (tile backs)
+     */
+    renderComputerRack() {
+        const rackEl = document.getElementById('computer-rack');
+        rackEl.innerHTML = '';
+
+        // Render tile backs for each computer tile
+        this.gameState.computerRack.forEach(() => {
+            const tileBack = document.createElement('div');
+            tileBack.className = 'tile-back';
+            rackEl.appendChild(tileBack);
+        });
     }
 
     /**
@@ -175,6 +198,18 @@ export class GameController {
                 const groupEl = e.target.closest('.group');
                 this.dragSource = { type: 'group', index: parseInt(groupEl.dataset.groupIndex) };
             }
+
+            // Create a custom drag image to prevent the tile from disappearing
+            const dragImage = e.target.cloneNode(true);
+            dragImage.style.position = 'absolute';
+            dragImage.style.top = '-1000px';
+            document.body.appendChild(dragImage);
+            e.dataTransfer.setDragImage(dragImage, 25, 35);
+
+            // Remove the temporary drag image after a brief delay
+            setTimeout(() => {
+                document.body.removeChild(dragImage);
+            }, 0);
 
             e.target.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
@@ -370,5 +405,106 @@ export class GameController {
         }
 
         winScreen.classList.remove('hidden');
+
+        // Stop AI mode when game ends
+        if (this.aiModeInterval) {
+            clearInterval(this.aiModeInterval);
+            this.aiModeInterval = null;
+        }
+    }
+
+    /**
+     * Toggle AI mode
+     */
+    toggleAIMode(enabled) {
+        this.aiMode = enabled;
+
+        if (enabled) {
+            this.showMessage('AI Mode Enabled - Auto-playing...', 'info');
+            this.startAIMode();
+        } else {
+            this.showMessage('AI Mode Disabled', 'info');
+            this.stopAIMode();
+        }
+    }
+
+    /**
+     * Start AI mode - automatically play the game
+     */
+    startAIMode() {
+        // Make a move every 2 seconds
+        this.aiModeInterval = setInterval(() => {
+            if (this.gameState.gameOver) {
+                this.stopAIMode();
+                return;
+            }
+
+            this.makeAIMove();
+        }, 2000);
+    }
+
+    /**
+     * Stop AI mode
+     */
+    stopAIMode() {
+        if (this.aiModeInterval) {
+            clearInterval(this.aiModeInterval);
+            this.aiModeInterval = null;
+        }
+    }
+
+    /**
+     * Make an AI move for the player
+     */
+    async makeAIMove() {
+        // Use the same logic as computer AI
+        const possibleSets = RummikubRules.findPossibleSets(this.gameState.playerRack);
+
+        if (possibleSets.length > 0 &&
+            (this.gameState.playerHasMelded || RummikubRules.calculateValue(possibleSets[0]) >= 30)) {
+            // Play first valid set
+            const setToPlay = possibleSets[0];
+
+            // Remove tiles from player rack
+            setToPlay.forEach(tile => {
+                const index = this.gameState.playerRack.findIndex(t => t.id === tile.id);
+                if (index !== -1) {
+                    this.gameState.playerRack.splice(index, 1);
+                }
+            });
+
+            // Add to table
+            this.gameState.table.push(setToPlay);
+            this.gameState.playerHasMelded = true;
+
+            // Render and check win
+            this.render();
+
+            if (this.gameState.playerRack.length === 0) {
+                this.gameState.gameOver = true;
+                this.gameState.winner = 'player';
+                this.showWinScreen('player');
+                return;
+            }
+
+            // End turn
+            await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+            // Draw a card
+            this.drawCard();
+        }
+
+        // Computer's turn after a delay
+        if (!this.gameState.gameOver) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await this.gameState.computerTurn();
+
+            if (this.gameState.winner === 'computer') {
+                this.showWinScreen('computer');
+                return;
+            }
+
+            this.render();
+        }
     }
 }
