@@ -1,6 +1,7 @@
 import { GameState } from './GameState.js';
 import { RummikubRules } from './RummikubRules.js';
 import { UltraAI } from './ai/UltraAI.js';
+import { AnimationHelper } from './AnimationHelper.js';
 
 /**
  * Controls game flow and UI interactions
@@ -72,6 +73,9 @@ export class GameController {
         // Render initial state
         this.render();
 
+        // Set player as active
+        AnimationHelper.setActivePlayer(true);
+
         // Enable undo button
         document.getElementById('undo-btn').disabled = false;
     }
@@ -101,12 +105,19 @@ export class GameController {
      */
     renderComputerRack() {
         const rackEl = document.getElementById('computer-rack');
+        const previousCount = rackEl.children.length;
         rackEl.innerHTML = '';
 
         // Render tile backs for each computer tile
-        this.gameState.computerRack.forEach(() => {
+        this.gameState.computerRack.forEach((tile, index) => {
             const tileBack = document.createElement('div');
             tileBack.className = 'tile-back';
+
+            // Add animation for new tiles
+            if (this.gameState.computerRack.length > previousCount) {
+                AnimationHelper.addSlideInAnimation(tileBack, index * 30);
+            }
+
             rackEl.appendChild(tileBack);
         });
     }
@@ -116,10 +127,17 @@ export class GameController {
      */
     renderPlayerRack() {
         const rackEl = document.getElementById('player-rack');
+        const previousCount = rackEl.children.length;
         rackEl.innerHTML = '';
 
-        this.gameState.playerRack.forEach(tile => {
+        this.gameState.playerRack.forEach((tile, index) => {
             const tileEl = tile.createDOMElement();
+
+            // Add animation for newly drawn tiles
+            if (this.gameState.playerRack.length > previousCount) {
+                AnimationHelper.addPopInAnimation(tileEl);
+            }
+
             this.makeTileDraggable(tileEl);
             rackEl.appendChild(tileEl);
         });
@@ -315,8 +333,17 @@ export class GameController {
      * Sort player's rack
      */
     sortPlayerRack(byNumber = false) {
+        // Add sorting class for animation
+        const rackEl = document.getElementById('player-rack');
+        const tiles = Array.from(rackEl.querySelectorAll('.tile'));
+
+        tiles.forEach(tile => tile.classList.add('sorting'));
+
         this.gameState.sortRack(this.gameState.playerRack, byNumber);
-        this.renderPlayerRack();
+
+        setTimeout(() => {
+            this.renderPlayerRack();
+        }, 100);
     }
 
     /**
@@ -332,6 +359,9 @@ export class GameController {
      * Draw a card from pouch
      */
     async drawCard(autoEndTurn = true) {
+        // Animate draw button
+        AnimationHelper.animateDrawTile();
+
         const tile = this.gameState.drawTile('player');
         if (tile) {
             this.gameState.playerDrewThisTurn = true;
@@ -347,6 +377,7 @@ export class GameController {
             }
         } else {
             this.showMessage('Pouch is empty!', 'error');
+            AnimationHelper.shakeElement(document.getElementById('draw-btn'));
         }
     }
 
@@ -358,6 +389,7 @@ export class GameController {
 
         if (!result.success) {
             this.showMessage(result.message, 'error');
+            AnimationHelper.shakeElement(document.getElementById('player-rack'));
             return;
         }
 
@@ -369,15 +401,25 @@ export class GameController {
             return;
         }
 
+        // Turn transition effect
+        AnimationHelper.turnTransition();
+        AnimationHelper.setActivePlayer(false); // Computer's turn
+
         // Computer's turn
+        AnimationHelper.showAIThinking();
         this.showMessage('Computer is thinking...', 'info');
+
         await this.gameState.computerTurn();
+
+        AnimationHelper.hideAIThinking();
 
         if (this.gameState.winner === 'computer') {
             this.showWinScreen('computer');
             return;
         }
 
+        // Player's turn again
+        AnimationHelper.setActivePlayer(true);
         this.render();
     }
 
@@ -386,9 +428,39 @@ export class GameController {
      */
     updateStats() {
         const stats = this.gameState.getStats();
-        document.getElementById('player-count').textContent = `x${stats.playerTileCount}`;
-        document.getElementById('computer-count').textContent = `x${stats.computerTileCount}`;
-        document.getElementById('pouch-count').textContent = `x${stats.pouchCount}`;
+
+        // Store previous values
+        if (!this.previousStats) {
+            this.previousStats = stats;
+        }
+
+        const playerCount = document.getElementById('player-count');
+        const computerCount = document.getElementById('computer-count');
+        const pouchCount = document.getElementById('pouch-count');
+
+        // Animate if values changed
+        if (stats.playerTileCount !== this.previousStats.playerTileCount) {
+            playerCount.textContent = `x${stats.playerTileCount}`;
+            AnimationHelper.animateCountChange(playerCount);
+        } else {
+            playerCount.textContent = `x${stats.playerTileCount}`;
+        }
+
+        if (stats.computerTileCount !== this.previousStats.computerTileCount) {
+            computerCount.textContent = `x${stats.computerTileCount}`;
+            AnimationHelper.animateCountChange(computerCount);
+        } else {
+            computerCount.textContent = `x${stats.computerTileCount}`;
+        }
+
+        if (stats.pouchCount !== this.previousStats.pouchCount) {
+            pouchCount.textContent = `x${stats.pouchCount}`;
+            AnimationHelper.animateCountChange(pouchCount);
+        } else {
+            pouchCount.textContent = `x${stats.pouchCount}`;
+        }
+
+        this.previousStats = stats;
     }
 
     /**
@@ -415,11 +487,16 @@ export class GameController {
 
         if (winner === 'player') {
             winnerText.textContent = 'You Win!';
+            // Celebrate player win
+            AnimationHelper.celebrateWin(true);
         } else {
             winnerText.textContent = 'Computer Wins!';
         }
 
         winScreen.classList.remove('hidden');
+
+        // Clear active player indicators
+        AnimationHelper.clearActivePlayer();
 
         // Stop AI mode when game ends
         if (this.aiModeInterval) {
