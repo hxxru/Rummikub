@@ -28,9 +28,30 @@
 
         <!-- Game Screen -->
         <div id="game-screen" class="hidden">
+            <!-- Container 0: Computer Area -->
+            <div class="container0">
+                <div class="computer-info">
+                    <p>Computer</p>
+                    <div>
+                        <img src="/images/tileBack.png" alt="Tile back">
+                        <span id="computer-count">x14</span>
+                    </div>
+                </div>
+                <div class="computer-rack" id="computer-rack">
+                    <!-- Computer tiles (tile backs) will be added here -->
+                </div>
+            </div>
+
             <!-- Container 1: Header -->
             <div class="container1">
                 <h1>Rummikub</h1>
+                <div class="ai-mode-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="ai-mode-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label for="ai-mode-toggle">AI Mode</label>
+                </div>
             </div>
 
             <!-- Container 2: Playing Area -->
