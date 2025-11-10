@@ -43,8 +43,8 @@ export class GameState {
      */
     createAllTiles() {
         const tiles = [];
-        // Use only one row per color: 1=black, 3=blue, 5=orange, 7=red
-        const rows = ['1', '3', '5', '7'];
+        // Use one row per color: 1=black, 2=blue, 3=orange, 4=red
+        const rows = ['1', '2', '3', '4'];
 
         // Create 2 sets of each tile (4 colors × 13 numbers × 2 = 104 tiles)
         for (let set = 0; set < 2; set++) {

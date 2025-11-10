@@ -10,10 +10,10 @@ export class Tile {
     };
 
     static COLOR_CODES = {
-        '1': 'black', '2': 'black',
-        '3': 'blue', '4': 'blue',
-        '5': 'orange', '6': 'orange',
-        '7': 'red', '8': 'red'
+        '1': 'black',
+        '2': 'blue',
+        '3': 'orange',
+        '4': 'red'
     };
 
     constructor(id, number, color, imagePath) {
