@@ -11,65 +11,97 @@ export class SmartAI extends AIPlayer {
     }
 
     /**
-     * Make a move using table manipulation
+     * Make a move using table manipulation and playing ALL possible sets
      */
     async makeMove(gameState) {
         // Add small delay to simulate thinking
         await this.delay(1000);
 
-        // Only manipulate table if we've already melded
+        const setsToPlay = [];
+        const manipulations = [];
+        let remainingRack = [...gameState.computerRack];
+        const requirement = gameState.initialMeldRequirement || 30;
+
+        // If already melded, try table manipulations first
         if (gameState.computerHasMelded) {
-            // Try to find table manipulation opportunities
-            const tableMove = this.findTableManipulation(gameState);
-            if (tableMove) {
-                return tableMove;
+            // Try extending runs and adding to groups
+            for (let i = 0; i < gameState.runs.length; i++) {
+                const run = gameState.runs[i];
+                if (run.length === 0) continue;
+
+                const extension = this.canExtendRun(run, remainingRack);
+                if (extension) {
+                    manipulations.push({
+                        type: 'extendRun',
+                        targetIndex: i,
+                        tiles: extension
+                    });
+                    // Remove tiles from remaining rack
+                    extension.forEach(tile => {
+                        const index = remainingRack.findIndex(t => t.instanceId === tile.instanceId);
+                        if (index !== -1) {
+                            remainingRack.splice(index, 1);
+                        }
+                    });
+                }
+            }
+
+            for (let i = 0; i < gameState.groups.length; i++) {
+                const group = gameState.groups[i];
+                if (group.length === 0 || group.length >= 4) continue;
+
+                const addition = this.canAddToGroup(group, remainingRack);
+                if (addition) {
+                    manipulations.push({
+                        type: 'addToGroup',
+                        targetIndex: i,
+                        tiles: [addition]
+                    });
+                    const index = remainingRack.findIndex(t => t.instanceId === addition.instanceId);
+                    if (index !== -1) {
+                        remainingRack.splice(index, 1);
+                    }
+                }
             }
         }
 
-        // Fall back to normal play (like GreedyAI)
-        const possibleSets = RummikubRules.findPossibleSets(gameState.computerRack);
+        // Play ALL regular sets from remaining rack
+        while (true) {
+            const possibleSets = RummikubRules.findPossibleSets(remainingRack);
 
-        if (possibleSets.length === 0) {
-            return { action: 'draw' };
+            let validSets = possibleSets;
+            if (!gameState.computerHasMelded && setsToPlay.length === 0 && manipulations.length === 0) {
+                validSets = possibleSets.filter(set =>
+                    RummikubRules.calculateValue(set) >= requirement
+                );
+            }
+
+            if (validSets.length === 0) break;
+
+            // Sort by number of tiles
+            validSets.sort((a, b) => b.length - a.length);
+
+            const setToPlay = validSets[0];
+            setsToPlay.push(setToPlay);
+
+            setToPlay.forEach(tile => {
+                const index = remainingRack.findIndex(t => t.instanceId === tile.instanceId);
+                if (index !== -1) {
+                    remainingRack.splice(index, 1);
+                }
+            });
         }
 
-        // Filter sets that meet initial meld requirement if needed
-        let validSets = possibleSets;
-        if (!gameState.computerHasMelded) {
-            const requirement = gameState.initialMeldRequirement || 30;
-            validSets = possibleSets.filter(set =>
-                RummikubRules.calculateValue(set) >= requirement
-            );
+        // Return combined manipulations and new sets
+        if (manipulations.length > 0 || setsToPlay.length > 0) {
+            return {
+                action: 'playMultiple',
+                sets: setsToPlay,
+                manipulations: manipulations
+            };
         }
 
-        if (validSets.length === 0) {
-            return { action: 'draw' };
-        }
-
-        // Sort by number of tiles (descending)
-        validSets.sort((a, b) => b.length - a.length);
-
-        // Play the largest set
-        const setToPlay = validSets[0];
-
-        // Determine if it's a run or group
-        const isRun = RummikubRules.isValidRun(setToPlay);
-        const targetType = isRun ? 'run' : 'group';
-
-        // Find first empty slot
-        const slots = isRun ? gameState.runs : gameState.groups;
-        const targetIndex = slots.findIndex(slot => slot.length === 0);
-
-        if (targetIndex === -1) {
-            return { action: 'draw' };
-        }
-
-        return {
-            action: 'play',
-            tiles: setToPlay,
-            targetType: targetType,
-            targetIndex: targetIndex
-        };
+        return { action: 'draw' };
     }
 
     /**

@@ -1,0 +1,89 @@
+============================================================
+RUMMIKUB AI TOURNAMENT
+============================================================
+Games per matchup: 100
+Total AIs: 4
+Total games: 1200
+============================================================
+
+Running 100 games: Random AI vs Greedy AI...
+.......... Done!
+Running 100 games: Random AI vs Value AI...
+.......... Done!
+Running 100 games: Random AI vs Smart AI...
+.......... Done!
+Running 100 games: Greedy AI vs Random AI...
+.......... Done!
+Running 100 games: Greedy AI vs Value AI...
+.......... Done!
+Running 100 games: Greedy AI vs Smart AI...
+.......... Done!
+Running 100 games: Value AI vs Random AI...
+.......... Done!
+Running 100 games: Value AI vs Greedy AI...
+.......... Done!
+Running 100 games: Value AI vs Smart AI...
+.......... Done!
+Running 100 games: Smart AI vs Random AI...
+.......... Done!
+Running 100 games: Smart AI vs Greedy AI...
+.......... Done!
+Running 100 games: Smart AI vs Value AI...
+.......... Done!
+
+============================================================
+TOURNAMENT RESULTS
+============================================================
+
+Rank | AI Name      | Wins | Losses | Win Rate | Avg Tiles/Move
+------------------------------------------------------------
+   1 | Smart AI     |    1 |    599 |      0.2% |             1.93
+   2 | Random AI    |    0 |    600 |      0.0% |             3.42
+   3 | Greedy AI    |    0 |    600 |      0.0% |             3.55
+   4 | Value AI     |    0 |    600 |      0.0% |             3.55
+============================================================
+
+DETAILED STATISTICS:
+------------------------------------------------------------
+
+Smart AI:
+  Description: Manipulates table sets strategically to maximize plays
+  Total Games: 600
+  Wins: 1
+  Losses: 599
+  Win Rate: 0.2%
+  Total Moves: 299550
+  Total Draws: 287442
+  Avg Tiles per Move: 1.93
+
+Random AI:
+  Description: Plays the first valid set found, otherwise draws
+  Total Games: 600
+  Wins: 0
+  Losses: 600
+  Win Rate: 0.0%
+  Total Moves: 300000
+  Total Draws: 293446
+  Avg Tiles per Move: 3.42
+
+Greedy AI:
+  Description: Plays the set with the most tiles to empty rack faster
+  Total Games: 600
+  Wins: 0
+  Losses: 600
+  Win Rate: 0.0%
+  Total Moves: 300000
+  Total Draws: 293566
+  Avg Tiles per Move: 3.55
+
+Value AI:
+  Description: Plays the highest value set to reduce penalty on loss
+  Total Games: 600
+  Wins: 0
+  Losses: 600
+  Win Rate: 0.0%
+  Total Moves: 299549
+  Total Draws: 293155
+  Avg Tiles per Move: 3.55
+
+============================================================

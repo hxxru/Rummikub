@@ -3,11 +3,9 @@
 /**
  * Tournament Runner - Runs AI vs AI matches and reports results
  * Run with: node scripts/runTournament.js [gamesPerMatchup]
- *
- * Note: Using 15-point initial meld instead of standard 30 for faster games
  */
 
-const INITIAL_MELD_REQUIREMENT = 15; // Lowered from 30 for testing
+const INITIAL_MELD_REQUIREMENT = 30; // Standard Rummikub rule
 
 import { Tile } from '../src/js/Tile.js';
 import { RummikubRules } from '../src/js/RummikubRules.js';
@@ -97,25 +95,58 @@ class TournamentGame {
         const move = await ai.makeMove(stateView);
 
         let tilesPlayed = 0;
+        const rack = player === 1 ? this.rack1 : this.rack2;
 
-        if (move.action === 'play') {
-            tilesPlayed = move.tiles.length;
+        if (move.action === 'playMultiple') {
+            // Apply manipulations first (SmartAI)
+            if (move.manipulations) {
+                for (const manip of move.manipulations) {
+                    tilesPlayed += manip.tiles.length;
 
-            // Remove tiles from rack
-            const rack = player === 1 ? this.rack1 : this.rack2;
-            move.tiles.forEach(tile => {
-                const index = rack.findIndex(t => t.instanceId === tile.instanceId);
-                if (index !== -1) {
-                    rack.splice(index, 1);
+                    // Remove tiles from rack
+                    manip.tiles.forEach(tile => {
+                        const index = rack.findIndex(t => t.instanceId === tile.instanceId);
+                        if (index !== -1) {
+                            rack.splice(index, 1);
+                        }
+                    });
+
+                    // Apply manipulation
+                    if (manip.type === 'extendRun') {
+                        this.runs[manip.targetIndex].push(...manip.tiles);
+                        this.runs[manip.targetIndex].sort((a, b) => a.number - b.number);
+                    } else if (manip.type === 'addToGroup') {
+                        this.groups[manip.targetIndex].push(...manip.tiles);
+                    }
                 }
-            });
+            }
 
-            // Add to table
-            if (move.targetType === 'run') {
-                this.runs[move.targetIndex] = move.tiles;
-                this.runs[move.targetIndex].sort((a, b) => a.number - b.number);
-            } else {
-                this.groups[move.targetIndex] = move.tiles;
+            // Play all new sets
+            for (const set of move.sets) {
+                tilesPlayed += set.length;
+
+                // Remove tiles from rack
+                set.forEach(tile => {
+                    const index = rack.findIndex(t => t.instanceId === tile.instanceId);
+                    if (index !== -1) {
+                        rack.splice(index, 1);
+                    }
+                });
+
+                // Add to table
+                const isRun = RummikubRules.isValidRun(set);
+                if (isRun) {
+                    const emptyIndex = this.runs.findIndex(r => r.length === 0);
+                    if (emptyIndex !== -1) {
+                        this.runs[emptyIndex] = set;
+                        this.runs[emptyIndex].sort((a, b) => a.number - b.number);
+                    }
+                } else {
+                    const emptyIndex = this.groups.findIndex(g => g.length === 0);
+                    if (emptyIndex !== -1) {
+                        this.groups[emptyIndex] = set;
+                    }
+                }
             }
 
             if (player === 1) {
@@ -129,32 +160,7 @@ class TournamentGame {
                 this.gameOver = true;
                 this.winner = player;
             }
-        } else if (move.action === 'manipulate') {
-            tilesPlayed = move.tilesToAdd.length;
-
-            // Remove tiles from rack
-            const rack = player === 1 ? this.rack1 : this.rack2;
-            move.tilesToAdd.forEach(tile => {
-                const index = rack.findIndex(t => t.instanceId === tile.instanceId);
-                if (index !== -1) {
-                    rack.splice(index, 1);
-                }
-            });
-
-            // Apply manipulation
-            if (move.manipulationType === 'extendRun') {
-                this.runs[move.targetIndex].push(...move.tilesToAdd);
-                this.runs[move.targetIndex].sort((a, b) => a.number - b.number);
-            } else if (move.manipulationType === 'addToGroup') {
-                this.groups[move.targetIndex].push(...move.tilesToAdd);
-            }
-
-            // Check win
-            if (rack.length === 0) {
-                this.gameOver = true;
-                this.winner = player;
-            }
-        } else {
+        } else if (move.action === 'draw') {
             // Draw
             this.drawTile(player);
         }
@@ -165,7 +171,7 @@ class TournamentGame {
 
     async play() {
         let turnCount = 0;
-        const maxTurns = 300; // Limited for performance - tie-breaker at end
+        const maxTurns = 500; // Safety limit
 
         // Disable delays for fast play
         const origDelay1 = this.ai1.delay;
@@ -196,20 +202,9 @@ class TournamentGame {
             this.ai1.recordGame(false);
             this.ai2.recordGame(true);
         } else {
-            // Tie-breaker: player with fewer tiles wins
-            if (this.rack1.length < this.rack2.length) {
-                this.winner = 1;
-                this.ai1.recordGame(true);
-                this.ai2.recordGame(false);
-            } else if (this.rack2.length < this.rack1.length) {
-                this.winner = 2;
-                this.ai1.recordGame(false);
-                this.ai2.recordGame(true);
-            } else {
-                // Exact tie - both lose
-                this.ai1.recordGame(false);
-                this.ai2.recordGame(false);
-            }
+            // No winner - both lose (should be rare with proper AI)
+            this.ai1.recordGame(false);
+            this.ai2.recordGame(false);
         }
 
         return {

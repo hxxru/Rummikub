@@ -11,60 +11,62 @@ export class GreedyAI extends AIPlayer {
     }
 
     /**
-     * Make a move by playing the largest possible set
+     * Make a move by playing ALL possible sets, prioritizing largest first
      */
     async makeMove(gameState) {
         // Add small delay to simulate thinking
         await this.delay(1000);
 
-        const possibleSets = RummikubRules.findPossibleSets(gameState.computerRack);
+        const setsToPlay = [];
+        const remainingRack = [...gameState.computerRack];
+        const requirement = gameState.initialMeldRequirement || 30;
 
-        if (possibleSets.length === 0) {
-            return { action: 'draw' };
-        }
+        // Keep finding and playing sets until we can't anymore
+        while (true) {
+            const possibleSets = RummikubRules.findPossibleSets(remainingRack);
 
-        // Filter sets that meet initial meld requirement if needed
-        let validSets = possibleSets;
-        if (!gameState.computerHasMelded) {
-            const requirement = gameState.initialMeldRequirement || 30;
-            validSets = possibleSets.filter(set =>
-                RummikubRules.calculateValue(set) >= requirement
-            );
-        }
-
-        if (validSets.length === 0) {
-            return { action: 'draw' };
-        }
-
-        // Sort by number of tiles (descending), then by value (descending) as tiebreaker
-        validSets.sort((a, b) => {
-            if (b.length !== a.length) {
-                return b.length - a.length;
+            // Filter for initial meld requirement if needed
+            let validSets = possibleSets;
+            if (!gameState.computerHasMelded && setsToPlay.length === 0) {
+                validSets = possibleSets.filter(set =>
+                    RummikubRules.calculateValue(set) >= requirement
+                );
             }
-            return RummikubRules.calculateValue(b) - RummikubRules.calculateValue(a);
-        });
 
-        // Play the set with most tiles
-        const setToPlay = validSets[0];
+            if (validSets.length === 0) break;
 
-        // Determine if it's a run or group
-        const isRun = RummikubRules.isValidRun(setToPlay);
-        const targetType = isRun ? 'run' : 'group';
+            // Sort by number of tiles (descending) - greedy strategy
+            validSets.sort((a, b) => {
+                if (b.length !== a.length) {
+                    return b.length - a.length;
+                }
+                return RummikubRules.calculateValue(b) - RummikubRules.calculateValue(a);
+            });
 
-        // Find first empty slot
-        const slots = isRun ? gameState.runs : gameState.groups;
-        const targetIndex = slots.findIndex(slot => slot.length === 0);
+            // Play largest set
+            const setToPlay = validSets[0];
+            setsToPlay.push(setToPlay);
 
-        if (targetIndex === -1) {
-            // No empty slots, draw instead
-            return { action: 'draw' };
+            // Remove tiles from remaining rack
+            setToPlay.forEach(tile => {
+                const index = remainingRack.findIndex(t => t.instanceId === tile.instanceId);
+                if (index !== -1) {
+                    remainingRack.splice(index, 1);
+                }
+            });
         }
 
+        // If we found sets to play, return them all
+        if (setsToPlay.length > 0) {
+            return {
+                action: 'playMultiple',
+                sets: setsToPlay
+            };
+        }
+
+        // No valid play, draw a card
         return {
-            action: 'play',
-            tiles: setToPlay,
-            targetType: targetType,
-            targetIndex: targetIndex
+            action: 'draw'
         };
     }
 
