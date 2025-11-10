@@ -147,14 +147,14 @@ export class GameController {
     }
 
     /**
-     * Render runs area (10 run slots)
+     * Render runs area (8 run slots)
      */
     renderRuns() {
         const runsArea = document.getElementById('runs-area');
         runsArea.innerHTML = '';
 
-        // Always show 10 run slots
-        for (let i = 0; i < 10; i++) {
+        // Always show 8 run slots (matching groups)
+        for (let i = 0; i < 8; i++) {
             const runEl = document.createElement('div');
             runEl.className = 'run';
             runEl.dataset.runIndex = i;
@@ -284,6 +284,7 @@ export class GameController {
      */
     handleTileDrop(tileEl, target) {
         const tileId = tileEl.dataset.tileId;
+        const instanceId = parseInt(tileEl.dataset.instanceId); // Use instanceId for unique identification
 
         // Find and remove tile from source
         let tile;
@@ -293,19 +294,24 @@ export class GameController {
             tile = this.gameState.removeTileFromRack(tileId);
         } else if (this.dragSource.type === 'run') {
             const sourceRun = this.gameState.runs[this.dragSource.index];
-            const tileIndex = sourceRun.findIndex(t => t.id === tileId);
+            // Use instanceId to find the exact tile, not just id (handles duplicate tiles)
+            const tileIndex = sourceRun.findIndex(t => t.instanceId === instanceId);
             if (tileIndex !== -1) {
                 tile = sourceRun.splice(tileIndex, 1)[0];
             }
         } else if (this.dragSource.type === 'group') {
             const sourceGroup = this.gameState.groups[this.dragSource.index];
-            const tileIndex = sourceGroup.findIndex(t => t.id === tileId);
+            // Use instanceId to find the exact tile, not just id (handles duplicate tiles)
+            const tileIndex = sourceGroup.findIndex(t => t.instanceId === instanceId);
             if (tileIndex !== -1) {
                 tile = sourceGroup.splice(tileIndex, 1)[0];
             }
         }
 
-        if (!tile) return;
+        if (!tile) {
+            console.error('Could not find tile to move:', { tileId, instanceId, source: this.dragSource });
+            return;
+        }
 
         // Track if tile is being added to board (for glow effect)
         const toBoard = target.type === 'run' || target.type === 'group';
@@ -409,9 +415,12 @@ export class GameController {
         AnimationHelper.showAIThinking();
         this.showMessage('Computer is thinking...', 'info');
 
-        await this.gameState.computerTurn();
+        const computerResult = await this.gameState.computerTurn();
 
         AnimationHelper.hideAIThinking();
+
+        // Show what computer did
+        this.showComputerAction(computerResult);
 
         if (this.gameState.winner === 'computer') {
             this.showWinScreen('computer');
@@ -421,6 +430,34 @@ export class GameController {
         // Player's turn again
         AnimationHelper.setActivePlayer(true);
         this.render();
+    }
+
+    /**
+     * Show computer's action in a message below their rack
+     */
+    showComputerAction(result) {
+        const messageEl = document.getElementById('computer-action-message');
+
+        let message = '';
+        if (result.action === 'draw') {
+            message = '🎴 Computer drew a tile';
+        } else if (result.action === 'totalRebuild') {
+            message = `♻️ Computer rebuilt the table and played ${result.tilesPlayed} tile${result.tilesPlayed !== 1 ? 's' : ''} in ${result.setsPlayed} set${result.setsPlayed !== 1 ? 's' : ''}`;
+        } else if (result.action === 'playMultiple') {
+            message = `🎯 Computer played ${result.tilesPlayed} tile${result.tilesPlayed !== 1 ? 's' : ''} in ${result.setsPlayed} set${result.setsPlayed !== 1 ? 's' : ''}`;
+        } else if (result.action === 'play') {
+            message = `🎯 Computer played ${result.tilesPlayed} tile${result.tilesPlayed !== 1 ? 's' : ''}`;
+        } else if (result.action === 'manipulate') {
+            message = `🔄 Computer rearranged tiles and played ${result.tilesPlayed} tile${result.tilesPlayed !== 1 ? 's' : ''}`;
+        }
+
+        messageEl.textContent = message;
+        messageEl.classList.remove('hidden');
+
+        // Auto-hide after a few seconds
+        setTimeout(() => {
+            messageEl.classList.add('hidden');
+        }, 4000);
     }
 
     /**
