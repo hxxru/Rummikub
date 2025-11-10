@@ -3,7 +3,11 @@
 /**
  * Tournament Runner - Runs AI vs AI matches and reports results
  * Run with: node scripts/runTournament.js [gamesPerMatchup]
+ *
+ * Note: Using 15-point initial meld instead of standard 30 for faster games
  */
+
+const INITIAL_MELD_REQUIREMENT = 15; // Lowered from 30 for testing
 
 import { Tile } from '../src/js/Tile.js';
 import { RummikubRules } from '../src/js/RummikubRules.js';
@@ -83,7 +87,8 @@ class TournamentGame {
             groups: this.groups,
             computerHasMelded: player === 1 ? this.melded1 : this.melded2,
             playerHasMelded: player === 1 ? this.melded2 : this.melded1,
-            pouch: this.pouch
+            pouch: this.pouch,
+            initialMeldRequirement: INITIAL_MELD_REQUIREMENT  // Pass to AIs
         };
     }
 
@@ -160,7 +165,7 @@ class TournamentGame {
 
     async play() {
         let turnCount = 0;
-        const maxTurns = 200;
+        const maxTurns = 300; // Limited for performance - tie-breaker at end
 
         // Disable delays for fast play
         const origDelay1 = this.ai1.delay;
@@ -191,9 +196,20 @@ class TournamentGame {
             this.ai1.recordGame(false);
             this.ai2.recordGame(true);
         } else {
-            // Draw
-            this.ai1.recordGame(false);
-            this.ai2.recordGame(false);
+            // Tie-breaker: player with fewer tiles wins
+            if (this.rack1.length < this.rack2.length) {
+                this.winner = 1;
+                this.ai1.recordGame(true);
+                this.ai2.recordGame(false);
+            } else if (this.rack2.length < this.rack1.length) {
+                this.winner = 2;
+                this.ai1.recordGame(false);
+                this.ai2.recordGame(true);
+            } else {
+                // Exact tie - both lose
+                this.ai1.recordGame(false);
+                this.ai2.recordGame(false);
+            }
         }
 
         return {

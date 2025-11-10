@@ -26,8 +26,9 @@ export class GreedyAI extends AIPlayer {
         // Filter sets that meet initial meld requirement if needed
         let validSets = possibleSets;
         if (!gameState.computerHasMelded) {
+            const requirement = gameState.initialMeldRequirement || 30;
             validSets = possibleSets.filter(set =>
-                RummikubRules.calculateValue(set) >= 30
+                RummikubRules.calculateValue(set) >= requirement
             );
         }
 

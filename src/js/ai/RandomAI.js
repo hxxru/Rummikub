@@ -21,8 +21,9 @@ export class RandomAI extends AIPlayer {
 
         // Filter for initial meld requirement if needed
         if (!gameState.computerHasMelded) {
+            const requirement = gameState.initialMeldRequirement || 30;
             possibleSets = possibleSets.filter(set =>
-                RummikubRules.calculateValue(set) >= 30
+                RummikubRules.calculateValue(set) >= requirement
             );
         }
 
