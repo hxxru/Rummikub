@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/style.css">
+    <title>Rummikub Online Game</title>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js" defer></script>  
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js" defer></script>
+    <script src="js/script.js" defer></script>
+   
+</head>
+<body>
+    <div class="container1" style="filter: blur(2px);">
+        <h1>Rummikub</h1>
+        <!-- <div class="computer-info">
+            <p>Computer</p>
+            <div>
+                <img src="images/tileBack.png" alt="">
+                <span id="c-tile-count">x14</span>
+            </div>
+        </div>
+        <div class="computer-rack">
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+            <div class="tile computer"></div>
+        </div> -->
+    </div>   
+    <div class="container2" style="filter: blur(2px);">
+        <div class="groups">
+        </div>
+        <div class="runs">
+        </div> 
+        <div class="pouch">
+            <button id="draw" class="draw">Draw</button>
+            <div>
+                <img src="images/tileBack.png" alt="">
+                <span id="public-pouch">x58</span>
+            </div>
+        </div>
+    </div>
+    <div class="container3" style="filter: blur(2px);">
+        <div class="player-info">
+            <p>Player</p>
+            <div>
+                <img src="images/tileBack.png" alt="">
+                <span id="p-tile-count" >x14</span>
+            </div>
+        </div>
+        <div class="player-rack">
+          
+        </div>
+        <button class="done">Done</button>
+        <!-- <button class="reverse">Reverse</button> -->
+       
+    </div>
+    <div class="win" style="display: none;">
+        <h2>You Win!</h2>
+        <button class="restart">Restart!</button>
+    </div>
+    <div class="start" style="z-index: 2; position: fixed; height: 60vh; width: 60vw; top: 20vh; left: 20vw; background-color:burlywood ; border-radius: 15px; text-align: center;">
+        <h2>Welcome to Rummikub!</h2>
+        <button class="startbtn">Start</button>
+    </div>
+    
+
+</body>
+</html>
