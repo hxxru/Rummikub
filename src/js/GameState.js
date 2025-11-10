@@ -9,7 +9,7 @@ export class GameState {
         this.pouch = [];
         this.playerRack = [];
         this.computerRack = [];
-        this.runs = Array(10).fill(null).map(() => []); // 10 run slots
+        this.runs = Array(8).fill(null).map(() => []); // 8 run slots (matching groups)
         this.groups = Array(16).fill(null).map(() => []); // 16 group slots (2x8 layout)
         this.currentTurn = 'player'; // 'player' or 'computer'
         this.playerHasMelded = false; // Has player made initial 30+ meld?
@@ -275,7 +275,7 @@ export class GameState {
 
         if (move.action === 'totalRebuild') {
             // UltraAI: Complete table rebuild
-            this.runs = Array(10).fill(null).map(() => []);
+            this.runs = Array(8).fill(null).map(() => []);
             this.groups = Array(16).fill(null).map(() => []);
 
             for (const set of move.newSets) {
@@ -312,8 +312,14 @@ export class GameState {
                 this.winner = 'computer';
                 this.aiPlayer.recordMove(tilesPlayed);
                 this.aiPlayer.recordGame(true);
-                return { played: true, winner: 'computer' };
+                return { played: true, winner: 'computer', action: 'totalRebuild', tilesPlayed, setsPlayed: move.newSets.length };
             }
+
+            // Record move stats
+            this.aiPlayer.recordMove(tilesPlayed);
+            this.currentTurn = 'player';
+            this.startPlayerTurn();
+            return { played: true, action: 'totalRebuild', tilesPlayed, setsPlayed: move.newSets.length };
         } else if (move.action === 'playMultiple') {
             // Handle multiple sets being played at once
             if (move.manipulations) {
@@ -374,8 +380,14 @@ export class GameState {
                 this.winner = 'computer';
                 this.aiPlayer.recordMove(tilesPlayed);
                 this.aiPlayer.recordGame(true);
-                return { played: true, winner: 'computer' };
+                return { played: true, winner: 'computer', action: 'playMultiple', tilesPlayed, setsPlayed: move.sets ? move.sets.length : 0 };
             }
+
+            // Record move stats
+            this.aiPlayer.recordMove(tilesPlayed);
+            this.currentTurn = 'player';
+            this.startPlayerTurn();
+            return { played: true, action: 'playMultiple', tilesPlayed, setsPlayed: move.sets ? move.sets.length : 0 };
         } else if (move.action === 'play') {
             // Execute the play move
             const { tiles, targetType, targetIndex } = move;
@@ -406,8 +418,14 @@ export class GameState {
                 this.winner = 'computer';
                 this.aiPlayer.recordMove(tilesPlayed);
                 this.aiPlayer.recordGame(true);
-                return { played: true, winner: 'computer' };
+                return { played: true, winner: 'computer', action: 'play', tilesPlayed };
             }
+
+            // Record move stats
+            this.aiPlayer.recordMove(tilesPlayed);
+            this.currentTurn = 'player';
+            this.startPlayerTurn();
+            return { played: true, action: 'play', tilesPlayed };
         } else if (move.action === 'manipulate') {
             // Execute table manipulation move
             const { manipulationType, targetIndex, tilesToAdd } = move;
@@ -437,20 +455,30 @@ export class GameState {
                 this.winner = 'computer';
                 this.aiPlayer.recordMove(tilesPlayed);
                 this.aiPlayer.recordGame(true);
-                return { played: true, winner: 'computer' };
+                return { played: true, winner: 'computer', action: 'manipulate', tilesPlayed };
             }
+
+            // Record move stats
+            this.aiPlayer.recordMove(tilesPlayed);
+            this.currentTurn = 'player';
+            this.startPlayerTurn();
+            return { played: true, action: 'manipulate', tilesPlayed };
         } else if (move.action === 'draw') {
             // Draw a card
-            this.drawTile('computer');
+            const drawnTile = this.drawTile('computer');
+
+            // Record move stats
+            this.aiPlayer.recordMove(0);
+            this.currentTurn = 'player';
+            this.startPlayerTurn();
+
+            return { played: false, action: 'draw', drawnTile };
         }
 
-        // Record move stats
-        this.aiPlayer.recordMove(tilesPlayed);
-
+        // Fallback (shouldn't reach here)
         this.currentTurn = 'player';
         this.startPlayerTurn();
-
-        return { played: move.action === 'play' || move.action === 'manipulate' };
+        return { played: false, action: 'unknown' };
     }
 
     /**
